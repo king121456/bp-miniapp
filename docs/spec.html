@@ -1,0 +1,49 @@
+<meta charset=utf-8><style>
+*{box-sizing:border-box;margin:0}body{width:900px;padding:48px;font-family:"PingFang SC","Noto Sans CJK SC",sans-serif;color:#333333;background:#F4F7F6;line-height:1.6}
+h1{font-size:34px}h2{font-size:24px;margin:36px 0 14px;padding-left:12px;border-left:6px solid #10C495}h3{font-size:18px;margin:18px 0 8px;color:#10C495}
+.sub{color:#666666;margin-top:6px}.box{background:#fff;border-radius:20px;padding:24px;box-shadow:0 4px 18px rgba(20,60,50,.06)}
+.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.sw .c{height:72px;border-radius:14px;border:1px solid #E6E9F0}.sw b{display:block;margin-top:8px}.sw span{font-family:monospace;color:#666666;font-size:14px}.sw em{display:block;font-style:normal;font-size:13px;color:#666666}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:10px 8px;border-bottom:1px solid #EEF1F6;vertical-align:middle}th{color:#666666;font-weight:500;font-size:15px}
+.no{background:#FFF6F0;border-radius:14px;padding:14px 18px;margin-top:14px;font-size:15px}
+.ic{display:flex;gap:22px;flex-wrap:wrap}.ic div{text-align:center;font-size:14px;color:#666666}.ic svg{display:block;margin:0 auto 6px;color:#10C495}
+code{background:#E3F8F1;padding:1px 6px;border-radius:6px;font-size:14px}
+</style>
+<h1>血压记录小程序 · 设计规范 v1.0</h1><p class=sub>适用于 uni-app 微信小程序。两条底线：适老化（大字、大按钮、步骤少），数据中性展示（不分级、不评价、不画正常范围线）。</p>
+
+<h2>一、色彩规范</h2><div class=box><h3>品牌色与渐变</h3><div class=grid><div class=sw><div class=c style="background:#10C495"></div><b>品牌色</b><span>#10C495</span><em>主色、选中态、链接</em></div><div class=sw><div class=c style="background:linear-gradient(90deg,#34C9A3,#62E17D)"></div><b>渐变·主</b><span>#34C9A3 → #62E17D</span><em>主按钮、今日血压卡片</em></div><div class=sw><div class=c style="background:linear-gradient(90deg,#70E8C9,#A7FFB9)"></div><b>渐变·浅</b><span>#70E8C9 → #A7FFB9</span><em>页头背景、插画底</em></div><div class=sw><div class=c style="background:#E3F8F1"></div><b>品牌浅底</b><span>#E3F8F1</span><em>图标底、选中标签背景</em></div></div><h3>辅助色（只用于功能入口和装饰，不用于数据）</h3><div class=grid><div class=sw><div class=c style="background:#31CD4C"></div><b>辅助绿</b><span>#31CD4C</span><em>希望-活力 · 打卡完成</em></div><div class=sw><div class=c style="background:#FBA900"></div><b>辅助橙</b><span>#FBA900</span><em>温暖-关爱 · 家人共享、提醒入口</em></div><div class=sw><div class=c style="background:#37A5E6"></div><b>辅助蓝</b><span>#37A5E6</span><em>专业-高效 · 设置、隐私说明</em></div><div class=sw><div class=c style="background:#F4F7F6"></div><b>页面背景</b><span>#F4F7F6</span><em></em></div></div><h3>字体用色</h3><div class=grid><div class=sw><div class=c style="background:#000000"></div><b>文字·强调</b><span>#000000</span><em>血压数值</em></div><div class=sw><div class=c style="background:#333333"></div><b>文字·主</b><span>#333333</span><em>标题、正文</em></div><div class=sw><div class=c style="background:#666666"></div><b>文字·次</b><span>#666666</span><em>说明、单位、时间</em></div><div class=sw><div class=c style="background:#999999"></div><b>文字·弱</b><span>#999999</span><em>仅用于占位提示、禁用</em></div></div><div class=no><b>使用约束：</b>血压、心率数值和图表一律用黑色或品牌色，不按数值切换颜色；橙色、绿色不得用来表示"偏高""正常"等含义，也不画正常范围线。品牌绿上的白字对比度偏低，白字只用在 20px 以上的粗体；#999 不用于正文。</div></div>
+
+<h2>二、字体规范</h2><div class=box><p>字体：系统默认（iOS 苹方 / 安卓思源黑体）；数字可用 <code>DIN Alternate</code>，没有就退回系统字体。单位 rpx，750rpx = 屏宽，1px ≈ 2rpx。</p>
+<table><tr><th>层级</th><th>大小</th><th>字重</th><th>用途</th><th>示例</th></tr>
+<tr><td>数值·超大</td><td>128rpx（64px）</td><td>700</td><td>首页今日血压</td><td style="font-size:40px;font-weight:700">128/82</td></tr>
+<tr><td>数值·大</td><td>96rpx（48px）</td><td>700</td><td>录入框数字、历史详情</td><td style="font-size:32px;font-weight:700">128</td></tr>
+<tr><td>大标题</td><td>56rpx（28px）</td><td>700</td><td>页面问候、空状态</td><td style="font-size:26px;font-weight:700">下午好</td></tr>
+<tr><td>标题</td><td>40rpx（20px）</td><td>600</td><td>卡片标题、按钮</td><td style="font-size:20px;font-weight:600">今日用药</td></tr>
+<tr><td>正文</td><td>36rpx（18px）</td><td>400</td><td>列表、说明（最小正文）</td><td style="font-size:18px">早上 08:00 · 1 片</td></tr>
+<tr><td>辅助</td><td>32rpx（16px）</td><td>400</td><td>时间、单位、Tab 文字（全局最小）</td><td style="font-size:16px;color:#666666">mmHg</td></tr></table>
+<p class=sub>行高：正文 1.5，段落说明 1.6。全局不小于 16px；要跟随系统"大字体"设置放大，布局不能被撑破。</p></div>
+
+<h2>三、图标规范</h2><div class=box><p>线性图标，24×24 画板，描边 2px，圆角端点，颜色跟随文字（未选中 <code>#999999</code>，选中 <code>#10C495</code>）。功能图标放在 48×48、圆角 14 的浅蓝底块里。图标一律配文字，不单独用图标表达意思。点击区域不小于 88rpx×88rpx。</p><br>
+<div class=ic>
+<div><svg width=40 height=40 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round><path d="M3 11l9-7 9 7v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1z"/></svg>首页</div>
+<div><svg width=40 height=40 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round><path d="M4 19V5M4 19h16M8 15l4-4 3 3 5-6"/></svg>记录/趋势</div>
+<div><svg width=40 height=40 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2><circle cx=12 cy=8 r=4 /><path d="M4 21c1-4 4-6 8-6s7 2 8 6" stroke-linecap=round /></svg>我的</div>
+<div><svg width=40 height=40 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round><path d="M12 5v14M5 12h14"/></svg>新增</div>
+<div><svg width=40 height=40 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round stroke-linejoin=round><rect x=3 y=9 width=18 height=6 rx=3 transform="rotate(-45 12 12)"/><path d="M9.5 9.5l5 5"/></svg>用药</div>
+<div><svg width=40 height=40 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round><circle cx=12 cy=13 r=8 /><path d="M12 9v4l3 2M5 3L2 6M19 3l3 3"/></svg>提醒</div>
+<div><svg width=40 height=40 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round><circle cx=9 cy=8 r=3.5 /><circle cx=17 cy=9 r=2.5 /><path d="M2 20c.8-3.5 3.5-5 7-5s6.2 1.5 7 5M16 14c3 0 5 1.5 6 4"/></svg>家人</div>
+<div><svg width=40 height=40 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round stroke-linejoin=round><path d="M5 12l5 5 9-10"/></svg>完成</div>
+<div><svg width=40 height=40 viewBox="0 0 24 24" fill=none stroke=currentColor stroke-width=2 stroke-linecap=round stroke-linejoin=round><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/></svg>隐私</div>
+</div><p class=sub style="margin-top:12px">上线前把 emoji 占位（💊⏰📝）全部换成这套线性图标，保证各机型显示一致。</p></div>
+
+<h2>四、布局规范</h2><div class=box><table>
+<tr><th>项目</th><th>规范</th></tr>
+<tr><td>栅格与边距</td><td>页面左右边距 32rpx（16px）；间距只用 8 的倍数：8 / 16 / 24 / 32 / 48rpx</td></tr>
+<tr><td>卡片</td><td>白底，圆角 40rpx（20px），内边距 40rpx，卡片间距 28rpx，阴影 0 4px 18px rgba(20,60,50,.06)</td></tr>
+<tr><td>主按钮</td><td>高 120rpx（60px），通栏，胶囊圆角，主色渐变；一屏只放一个主按钮</td></tr>
+<tr><td>次按钮</td><td>高 88rpx（44px），浅灰底或主色描边</td></tr>
+<tr><td>点击区域</td><td>所有可点元素不小于 88rpx × 88rpx，相邻可点元素间距不小于 16rpx</td></tr>
+<tr><td>导航</td><td>底部 3 个 Tab：首页 / 记录 / 我的；层级不超过 3 层；右上角给微信胶囊按钮留出位置</td></tr>
+<tr><td>首页结构</td><td>问候与日期 → 今日血压大卡片 → 记录按钮 → 今日用药 → 待办提醒</td></tr>
+<tr><td>录入流程</td><td>不超过 3 步：填高压/低压 → 选症状（可跳过）→ 保存；时间自动记录；默认弹出数字键盘</td></tr>
+<tr><td>反馈</td><td>保存、打卡后出现大号提示（≥ 2 秒）；删除和注销用二次确认弹窗，按钮写清动作，比如"删除这条记录"</td></tr>
+<tr><td>文案</td><td>短句、口语化；只描述功能，不写疗效（禁用"控制血压、降压、守护健康"等说法）</td></tr></table></div>
