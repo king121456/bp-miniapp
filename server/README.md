@@ -26,7 +26,7 @@
 - `GET /api/meds/checkins` 近 30 天打卡记录。
 
 ## 提醒与订阅消息
-- `GET/PUT /api/reminders/measure` `{ enabled, morning: "07:30", evening: "20:00" }`。
+- `GET/PUT /api/reminders/measure` `{ enabled, morning: "07:30", evening: "20:00", morningEnabled, eveningEnabled }`。`enabled` 是总开关，早晚可单独关，不传视为开。
 - `needSubscribe`：剩余推送次数少于 2 次时返回 `{ kind, templateId }`，否则为 `null`。前端拿 templateId 调 `wx.requestSubscribeMessage`。
 - `POST /api/subscribe` `{ accepted: ["measure","med","family"] }` 用户点了允许后上报，每项次数 +1，返回各类剩余次数。
 - `GET /api/todos` 没推送出去的提醒（次数用完或推送失败）；`POST /api/todos/:id/done` 关掉一条。录入血压、打卡后对应的待办会自动完成。

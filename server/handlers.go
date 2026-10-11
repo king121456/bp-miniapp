@@ -490,9 +490,11 @@ func (a *App) listCheckins(w http.ResponseWriter, r *http.Request, uid bson.Obje
 
 // ---------- reminders / subscribe / todos ----------
 type Measure struct {
-	Enabled bool   `json:"enabled" bson:"enabled"`
-	Morning string `json:"morning" bson:"morning"`
-	Evening string `json:"evening" bson:"evening"`
+	Enabled        bool   `json:"enabled" bson:"enabled"` // 总开关
+	Morning        string `json:"morning" bson:"morning"`
+	Evening        string `json:"evening" bson:"evening"`
+	MorningEnabled *bool  `json:"morningEnabled" bson:"morningEnabled"` // 不传视为开
+	EveningEnabled *bool  `json:"eveningEnabled" bson:"eveningEnabled"`
 }
 
 func (a *App) getMeasure(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) {
@@ -500,6 +502,13 @@ func (a *App) getMeasure(w http.ResponseWriter, r *http.Request, uid bson.Object
 		Measure Measure `bson:"measure"`
 	}
 	a.C("users").FindOne(r.Context(), bson.M{"_id": uid}).Decode(&u)
+	t := true
+	if u.Measure.MorningEnabled == nil {
+		u.Measure.MorningEnabled = &t
+	}
+	if u.Measure.EveningEnabled == nil {
+		u.Measure.EveningEnabled = &t
+	}
 	ok(w, u.Measure)
 }
 

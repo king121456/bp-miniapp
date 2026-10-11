@@ -14,10 +14,16 @@ import (
 // 次数用完后提醒进待办；注销后库里查不到该用户
 func TestReminderAndDelete(t *testing.T) {
 	ctx := context.Background()
-	cli, _ := mongo.Connect(options.Client().ApplyURI("mongodb://localhost:27017"))
-	db := cli.Database("bp_test")
+	db := testDB(t, "bp_test")
+	key := os.Getenv("DATA_KEY")
+	if len(key) != 64 {
+		key = "00000000000000000000000000000000000000000000000000000000000000aa"
+	}
 	db.Drop(ctx)
-	app, _ := NewApp(Config{JWTSecret: "x", DataKey: os.Getenv("DATA_KEY")}, db)
+	app, err := NewApp(Config{JWTSecret: "x", DataKey: key}, db)
+	if err != nil {
+		t.Fatal(err)
+	}
 	app.EnsureIndexes(ctx)
 	uid := bson.NewObjectID()
 	db.Collection("users").InsertOne(ctx, bson.M{"_id": uid, "openid": "t"})
@@ -38,4 +44,20 @@ func TestReminderAndDelete(t *testing.T) {
 	}
 	db.Collection("users").DeleteOne(ctx, bson.M{"_id": uid})
 	db.Drop(ctx)
+}
+
+// testDB 连不上本地 MongoDB 时跳过测试，而不是空指针
+func testDB(t *testing.T, name string) *mongo.Database {
+	t.Helper()
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	uri := os.Getenv("MONGO_URI")
+	if uri == "" {
+		uri = "mongodb://localhost:27017"
+	}
+	cli, err := mongo.Connect(options.Client().ApplyURI(uri).SetServerSelectionTimeout(2 * time.Second))
+	if err != nil || cli.Ping(ctx, nil) != nil {
+		t.Skip("MongoDB not reachable, skipping")
+	}
+	return cli.Database(name)
 }

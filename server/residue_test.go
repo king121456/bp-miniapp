@@ -5,14 +5,11 @@ import (
 	"testing"
 
 	"go.mongodb.org/mongo-driver/v2/bson"
-	"go.mongodb.org/mongo-driver/v2/mongo"
-	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
 func TestNoResidue(t *testing.T) {
 	ctx := context.Background()
-	cli, _ := mongo.Connect(options.Client().ApplyURI("mongodb://localhost:27017"))
-	db := cli.Database("bp")
+	db := testDB(t, "bp")
 	n, _ := db.Collection("users").CountDocuments(ctx, bson.M{"openid": "dev_p1"})
 	if n != 0 {
 		t.Fatal("user still exists")

@@ -32,7 +32,9 @@ func (a *App) tick(ctx context.Context, now time.Time) {
 	hm, date := now.Format("15:04"), now.Format("2006-01-02")
 
 	// measurement reminders
-	cur, err := a.C("users").Find(ctx, bson.M{"measure.enabled": true, "$or": bson.A{bson.M{"measure.morning": hm}, bson.M{"measure.evening": hm}}})
+	cur, err := a.C("users").Find(ctx, bson.M{"measure.enabled": true, "$or": bson.A{
+		bson.M{"measure.morning": hm, "measure.morningEnabled": bson.M{"$ne": false}},
+		bson.M{"measure.evening": hm, "measure.eveningEnabled": bson.M{"$ne": false}}}})
 	if err == nil {
 		var us []struct {
 			ID bson.ObjectID `bson:"_id"`
