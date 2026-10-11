@@ -10,6 +10,7 @@
     { "path": "pages/remind/remind", "style": { "navigationBarTitleText": "测量提醒" } },
     { "path": "pages/family/family", "style": { "navigationBarTitleText": "家人共享" } },
     { "path": "pages/family/view", "style": { "navigationBarTitleText": "家人视角预览" } },
+    { "path": "pages/report/report", "style": { "navigationBarTitleText": "就诊报告卡" } },
     { "path": "pages/privacy/privacy", "style": { "navigationBarTitleText": "隐私说明" } }
   ],
   "globalStyle": {

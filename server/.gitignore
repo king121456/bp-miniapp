@@ -1,0 +1,12 @@
+.env
+.env.*
+!.env.example
+*.env
+dev.env
+*.pem
+*.key
+/bp-server
+*.exe
+data/
+mongo-data/
+*.log

@@ -25,6 +25,7 @@
     </view>
     <view class="sh f16 c0 b">数据与隐私</view>
     <view class="card grp">
+      <view class="cell" @tap="go('/pages/report/report')"><view class="ic sm bg-g"><image src="/static/icons/chart-g.svg" /></view><view class="flex1 lt"><view class="f14 c3">就诊报告卡</view><view class="f10 c9">生成一张图片，看病时给医生看</view></view><image class="arrow" src="/static/icons/right-9.svg" /></view>
       <view class="cell" @tap="go('/pages/privacy/privacy')"><view class="ic sm bg-g"><image src="/static/icons/shield-g.svg" /></view><view class="flex1 lt"><view class="f14 c3">隐私说明</view><view class="f10 c9">数据怎么存、谁能看</view></view><image class="arrow" src="/static/icons/right-9.svg" /></view>
       <view class="cell" @tap="exp"><view class="ic sm bg-g"><image src="/static/icons/download-g.svg" /></view><view class="flex1 lt"><view class="f14 c3">导出数据</view><view class="f10 c9">下载全部记录（JSON 文件）</view></view><image class="arrow" src="/static/icons/right-9.svg" /></view>
       <view class="cell" @tap="clear"><view class="ic sm bg-k"><image src="/static/icons/refresh-6.svg" /></view><view class="flex1 lt"><view class="f14 c3">清除示例数据</view><view class="f10 c9">清空后从零开始记录</view></view><image class="arrow" src="/static/icons/right-9.svg" /></view>
