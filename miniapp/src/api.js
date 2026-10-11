@@ -125,16 +125,16 @@ export async function listCheckins() {
 
 // ---------- 测量提醒 ----------
 const DEF_REMIND = { morning: { on: true, time: '08:00' }, evening: { on: true, time: '20:00' } }
-// 后端只有一个 enabled 开关：本地结构 { morning:{on,time}, evening:{on,time} } 与之互转（关闭的时段时间传空串）
+// 后端：enabled 总开关 + morningEnabled / eveningEnabled 分开关（未返回时视为开）
 export async function getRemind() {
   if (USE_LOCAL) return get(K.remind, DEF_REMIND)
   const m = await req('/api/reminders/measure')
   if (!m || (!m.morning && !m.evening)) return DEF_REMIND
-  return { morning: { on: !!(m.enabled && m.morning), time: m.morning || '08:00' }, evening: { on: !!(m.enabled && m.evening), time: m.evening || '20:00' } }
+  return { morning: { on: !!(m.enabled && m.morning && m.morningEnabled !== false), time: m.morning || '08:00' }, evening: { on: !!(m.enabled && m.evening && m.eveningEnabled !== false), time: m.evening || '20:00' } }
 }
 export async function saveRemind(r) {
   if (!USE_LOCAL) {
-    await req('/api/reminders/measure', 'PUT', { enabled: r.morning.on || r.evening.on, morning: r.morning.on ? r.morning.time : '', evening: r.evening.on ? r.evening.time : '' })
+    await req('/api/reminders/measure', 'PUT', { enabled: r.morning.on || r.evening.on, morningEnabled: r.morning.on, eveningEnabled: r.evening.on, morning: r.morning.time, evening: r.evening.time })
     return {}
   }
   set(K.remind, r)
