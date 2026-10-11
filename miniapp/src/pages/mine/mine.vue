@@ -1,0 +1,77 @@
+<template>
+  <view class="pg">
+    <view class="deco"></view>
+    <view class="safe-top"></view>
+    <view class="navh f20 c0 b">我的</view>
+    <view class="prof">
+      <view class="av"><image src="/static/icons/user-w.svg" /></view>
+      <view class="flex1"><view class="f20 c0 b">{{ name }}</view><view class="f12 c6">已记录 {{ days }} 天 · 共 {{ total }} 次测量</view></view>
+    </view>
+    <view class="card grp">
+      <view class="cell" v-for="e in g1" :key="e.t" @tap="go(e.u)">
+        <view class="ic sm" :class="e.bg"><image :src="'/static/icons/' + e.i + '.svg'" /></view>
+        <text class="flex1 f14 c3 lt">{{ e.t }}</text><text class="f12 c9">{{ e.s }}</text><image class="arrow" src="/static/icons/right-9.svg" />
+      </view>
+    </view>
+    <view class="card grp">
+      <view class="cell" @tap="go('/pages/privacy/privacy')"><view class="ic sm bg-g"><image src="/static/icons/shield-g.svg" /></view><text class="flex1 f14 c3 lt">隐私说明</text><image class="arrow" src="/static/icons/right-9.svg" /></view>
+      <view class="cell" @tap="exp"><view class="ic sm bg-g"><image src="/static/icons/download-g.svg" /></view><text class="flex1 f14 c3 lt">导出数据</text><text class="f12 c9">JSON 文件</text><image class="arrow" src="/static/icons/right-9.svg" /></view>
+      <view class="cell" @tap="clear"><view class="ic sm bg-k"><image src="/static/icons/refresh-6.svg" /></view><text class="flex1 f14 c3 lt">清除示例数据</text><image class="arrow" src="/static/icons/right-9.svg" /></view>
+    </view>
+    <view class="card grp">
+      <view class="cell" @tap="logout"><view class="ic sm bg-k"><image src="/static/icons/trash-6.svg" /></view><text class="flex1 f14 c3 lt">删除全部数据并注销</text><image class="arrow" src="/static/icons/right-9.svg" /></view>
+    </view>
+    <view class="f10 c9 ft">本工具仅用于记录，不提供诊断建议 · 隐私协议版本 {{ ver }}</view>
+
+    <view class="mask" v-if="json" @tap="json = ''"><view class="modal" @tap.stop><view class="f16 c0 b mt">导出数据</view><scroll-view scroll-y class="jb"><text class="f10 c6" user-select>{{ json }}</text></scroll-view><view class="mb f16 cg b" @tap="json = ''">完成</view></view></view>
+  </view>
+</template>
+<script>
+import { guard, getProfile, listRecords, listMedDefs, listFamily, getRemind, exportData, deleteAccount, clearDemo, getConsent, dayKey } from '../../api.js'
+export default {
+  data: () => ({ name: '', total: 0, days: 0, meds: 0, fam: 0, rem: '', json: '', ver: '' }),
+  computed: { g1() { return [
+    { t: '用药管理', i: 'pill-g', bg: 'bg-g', u: '/pages/meds/meds', s: this.meds ? this.meds + ' 种药' : '未添加' },
+    { t: '测量提醒', i: 'bell-b', bg: 'bg-b', u: '/pages/remind/remind', s: this.rem },
+    { t: '家人共享', i: 'family-o', bg: 'bg-o', u: '/pages/family/family', s: this.fam ? this.fam + ' 位家人' : '未绑定' }] } },
+  async onShow() {
+    if (!guard()) return
+    this.name = getProfile().nickname; this.ver = (getConsent() || {}).version
+    const r = await listRecords(); this.total = r.length; this.days = new Set(r.map(x => dayKey(x.time))).size
+    this.meds = (await listMedDefs()).length; this.fam = (await listFamily()).length
+    const m = await getRemind(); const n = [m.morning.on, m.evening.on].filter(Boolean).length; this.rem = n ? '已开启 ' + n + ' 个' : '未开启'
+  },
+  methods: {
+    go(url) { uni.navigateTo({ url }) },
+    async exp() {
+      const s = JSON.stringify(await exportData(), null, 2)
+      // #ifdef H5
+      const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([s], { type: 'application/json' }))
+      a.download = 'bp-data-' + new Date().toISOString().slice(0, 10) + '.json'; document.body.appendChild(a); a.click(); a.remove()
+      uni.showToast({ title: '已下载 JSON 文件', icon: 'none' })
+      // #endif
+      // #ifndef H5
+      this.json = s
+      // #endif
+    },
+    clear() { uni.showModal({ title: '清除示例数据', content: '将清空当前的血压记录、药品、打卡和家人数据，确定吗？', confirmColor: '#10C495', success: r => { if (r.confirm) { clearDemo(); uni.showToast({ title: '已清除', icon: 'none' }); this.$nextTick(() => uni.switchTab({ url: '/pages/index/index' })) } } }) },
+    logout() { uni.showModal({ title: '删除全部数据并注销', content: '你的所有记录、用药、提醒和家人绑定都会被删除，且无法恢复。确定继续吗？', confirmText: '删除', confirmColor: '#E5484D', success: async r => { if (r.confirm) { await deleteAccount(); uni.reLaunch({ url: '/pages/login/login' }) } } }) }
+  }
+}
+</script>
+<style lang="scss" scoped>
+.pg { min-height: 100vh; background: linear-gradient(180deg, #DDF8EE 0, #EEF9F4 300rpx, #F5F7F6 560rpx); position: relative; overflow: hidden; }
+.deco { position: absolute; top: -120rpx; right: -160rpx; width: 520rpx; height: 520rpx; border-radius: 50%; background: radial-gradient(circle, rgba(167,255,185,.55), rgba(112,232,201,0) 70%); }
+.prof { position: relative; display: flex; align-items: center; gap: 28rpx; padding: 8rpx 40rpx 40rpx; }
+.av { width: 120rpx; height: 120rpx; border-radius: 60rpx; background: linear-gradient(120deg, #34C9A3, #62E17D); display: flex; align-items: center; justify-content: center; box-shadow: 0 16rpx 36rpx -10rpx rgba(16,196,149,.55); }
+.av image { width: 64rpx; height: 64rpx; }
+.grp { padding-top: 4rpx; padding-bottom: 4rpx; }
+.ic.sm { width: 64rpx; height: 64rpx; border-radius: 20rpx; } .ic.sm image { width: 36rpx; height: 36rpx; }
+.lt { margin-left: 24rpx; }
+.arrow { margin-left: 8rpx; }
+.ft { text-align: center; margin: 32rpx 0 48rpx; }
+.mask { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 99; display: flex; align-items: center; justify-content: center; }
+.modal { width: 640rpx; background: #fff; border-radius: 32rpx; overflow: hidden; }
+.mt { text-align: center; padding: 36rpx 0 16rpx; } .jb { height: 700rpx; padding: 0 32rpx; box-sizing: border-box; white-space: pre-wrap; word-break: break-all; }
+.mb { text-align: center; height: 100rpx; line-height: 100rpx; border-top: 1rpx solid #EEF1F0; }
+</style>
