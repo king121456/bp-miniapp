@@ -33,18 +33,18 @@
   </view>
 </template>
 <script>
-import { hasConsent, login, getRole, homeOf } from '../../api.js'
+import { hasConsent, login, getRole, homeOf, syncProfile } from '../../api.js'
 import { PRIVACY } from '../../common/privacy.js'
 export default {
   data: () => ({ agree: false, show: false, privacy: PRIVACY, points: [
     { i: 'edit-g', bg: 'bg-g', t: '几秒记下血压和心率' }, { i: 'bell-b', bg: 'bg-b', t: '按时提醒测量和用药' }, { i: 'family-o', bg: 'bg-o', t: '绑定家人，一起查看记录' }] }),
   onLoad() { if (hasConsent()) this.next() },
   methods: {
-    next() { const r = getRole(); uni.reLaunch({ url: r ? homeOf(r) : '/pages/role/role' }) },
+    async next(synced) { if (!synced) await syncProfile(); const r = getRole(); uni.reLaunch({ url: r ? homeOf(r) : '/pages/role/role' }) },
     async go() {
       if (!this.agree) return uni.showToast({ title: '请先勾选同意', icon: 'none' })
       uni.showLoading({ title: '登录中' })
-      try { await login(); uni.hideLoading(); this.next() } catch (e) { uni.hideLoading(); uni.showToast({ title: '登录失败，请重试', icon: 'none' }) }
+      try { await login(); uni.hideLoading(); this.next(true) } catch (e) { uni.hideLoading(); uni.showToast({ title: '登录失败，请重试', icon: 'none' }) }
     }
   }
 }

@@ -46,20 +46,22 @@ const dayKey = t => { const d = new Date(t); return d.getFullYear() + '-' + (d.g
 export const hasConsent = () => !!uni.getStorageSync(K.consent)
 export const getConsent = () => uni.getStorageSync(K.consent) || null
 export function guard() { if (!hasConsent()) { uni.reLaunch({ url: '/pages/login/login' }); return false } return true }
-export async function login(nickname = '王阿姨') {
+// 昵称只在本机已有时带上；不再每次登录用默认名覆盖后端昵称
+export async function login(nickname = (get(K.profile, null) || {}).nickname || '') {
   const consent = { agreedAt: Date.now(), version: CONSENT_VERSION }
   let code
   try { code = (await uni.login({ provider: 'weixin' })).code } catch (e) { uni.showToast({ title: '微信登录失败，请稍后再试', icon: 'none' }); throw e }
   const r = await req('/api/auth/login', 'POST', { code, nickname, consent })
   set('token', r.token)
   set(K.consent, consent)
-  if (!get(K.profile, null)) set(K.profile, { nickname, since: Date.now() })
+  if (!get(K.profile, null)) set(K.profile, { nickname: nickname || '用户', since: Date.now() })
+  await syncProfile() // 取回后端保存的昵称/头像/身份，重新登录不用再选身份
 }
 export const getProfile = () => get(K.profile, { nickname: '用户', since: Date.now() })
 export const setProfile = p => set(K.profile, { ...getProfile(), ...p })
 // 后端返回的 /uploads/... 相对地址补上 API 域名
 export const avatarSrc = u => !u ? '' : /^\//.test(u) ? BASE + u : u
-const keepMe = u => { if (u) setProfile({ nickname: u.nickname || getProfile().nickname, avatar: avatarSrc(u.avatarUrl) }); return getProfile() }
+const keepMe = u => { if (u) { setProfile({ nickname: u.nickname || getProfile().nickname, avatar: avatarSrc(u.avatarUrl) }); uni.setStorageSync(K.role, u.role || '') } return getProfile() }
 // GET /api/me → { nickname, avatarUrl, ... }
 export async function syncProfile() { return keepMe(await req('/api/me').catch(() => null)) }
 // PUT /api/me { nickname?, avatarUrl? }（昵称 1-20 字）
@@ -173,7 +175,8 @@ export async function bindFamily(code) { return req('/api/family/bind', 'POST', 
 export async function unfollowPatient(id) { return req('/api/family/' + id, 'DELETE') }
 // ---------- 身份入口：patient 我是患者 / family 我是家人 ----------
 export const getRole = () => uni.getStorageSync(K.role) || ''
-export const setRole = r => uni.setStorageSync(K.role, r)
+// 身份同时存本机和后端（PUT /api/me {role}），换设备/清缓存后登录仍能取回
+export const setRole = r => { uni.setStorageSync(K.role, r); req('/api/me', 'PUT', { role: r }, [undefined, 400, 404]).catch(() => {}) }
 export const homeOf = r => r === 'family' ? '/pages/family/home' : '/pages/index/index'
 export async function listTodos() { return req('/api/todos') }
 export async function doneTodo(id) { return req('/api/todos/' + id + '/done', 'POST') }

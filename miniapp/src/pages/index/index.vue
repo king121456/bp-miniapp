@@ -6,7 +6,7 @@
 
 
     <view class="vt" v-if="visit && visitTodo">
-      <view class="vh"><view class="ic bg-b"><image src="/static/icons/calendar-b.svg" /></view><view class="flex1 vtx"><view class="f12 c9">复诊待办</view><view class="f20 c0 b">{{ visitLine }}</view></view></view>
+      <view class="vh" @tap="go('/pages/visit/visit')"><view class="ic bg-b"><image src="/static/icons/calendar-b.svg" /></view><view class="flex1 vtx"><view class="f12 c9">复诊待办</view><view class="f20 c0 b">{{ visitLine }}</view></view></view>
       <view class="f14 c6 vsub" v-if="visitPlace">{{ visitPlace }}</view>
       <view class="btn vbtn" @tap="toCard">生成就诊卡片</view>
     </view>
@@ -65,10 +65,6 @@
     <view class="mini">
       <view class="card" @tap="go('/pages/family/family')"><view class="ic bg-o"><image src="/static/icons/family-o.svg" /></view><view><view class="f14 c0 b">家人共享</view><view class="f10 c9">{{ famCount ? famCount + ' 位家人在关注' : '邀请家人查看' }}</view></view></view>
       <view class="card" @tap="go('/pages/remind/remind')"><view class="ic bg-b"><image src="/static/icons/bell-b.svg" /></view><view><view class="f14 c0 b">测量提醒</view><view class="f10 c9 num">{{ remindStr }}</view></view></view>
-    </view>
-    <view class="mini">
-      <view class="card" @tap="go('/pages/visit/visit')"><view class="ic bg-b"><image src="/static/icons/calendar-b.svg" /></view><view><view class="f14 c0 b">复诊提醒</view><view class="f10 c9">{{ visit ? md(visit.date) + ' 复诊' : '记下复诊日期' }}</view></view></view>
-      <view class="card" @tap="go('/pages/report/report')"><view class="ic bg-g"><image src="/static/icons/card-g.svg" /></view><view><view class="f14 c0 b">就诊报告卡</view><view class="f10 c9">看病时给医生看</view></view></view>
     </view>
     <slot-sheet :item="pick" @close="pick = null" @done="afterMakeup" />
     <view style="height:40rpx"></view>
