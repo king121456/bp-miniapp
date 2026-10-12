@@ -50,8 +50,10 @@ func main() {
 	if os.Getenv("APP_ENV") != "dev" && (cfg.WxAppID == "" || cfg.WxSecret == "") {
 		log.Fatal("WX_APPID and WX_SECRET are required unless APP_ENV=dev")
 	}
-	if os.Getenv("APP_ENV") == "dev" {
-		log.Print("WARNING: dev mode, any login code is accepted")
+	if cfg.WxAppID == "" {
+		log.Print("WARNING: WX_APPID empty, fake login enabled (any code is accepted, openid=dev_<code>)")
+	} else if os.Getenv("APP_ENV") == "dev" {
+		log.Print("APP_ENV=dev: real WeChat login, dev CORS allowed")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
