@@ -87,9 +87,9 @@ export default {
         for (const [p, col, dash] of [['morning', C.am, []], ['evening', C.pm, [4, 3]]]) for (const kk of keys) {
           ctx.setStrokeStyle(col); ctx.setFillStyle(col); ctx.setLineWidth(1.5); ctx.setLineDash(dash, 0)
           let open = false; ctx.beginPath()
-          S.forEach((d, i) => { const v = d[p] && d[p][kk]; if (v == null) { open = false; return } open ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)); open = true })
+          S.forEach((d, i) => { const v = d[p] && d[p][kk]; if (v == null) return; open ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)); open = true }) // 跨过没测量的日子连线
           ctx.stroke(); ctx.setLineDash([], 0)
-          S.forEach((d, i) => { const v = d[p] && d[p][kk]; if (v != null) { ctx.beginPath(); ctx.arc(X(i), Y(v), S.length > 40 ? 1 : 1.8, 0, 2 * Math.PI); ctx.fill() } })
+          S.forEach((d, i) => { const v = d[p] && d[p][kk]; if (v != null) { ctx.beginPath(); ctx.arc(X(i), Y(v), S.length > 40 ? 1.5 : 2.5, 0, 2 * Math.PI); ctx.fill() } })
         }
       }
       chart(108, 150, ['sys', 'dia'], '血压', 'mmHg'); txt('上方为收缩压，下方为舒张压', BW / 2, 270, 10, C.sub, 'center')

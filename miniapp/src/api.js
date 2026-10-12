@@ -56,6 +56,8 @@ export async function login(nickname = '王阿姨') {
   if (!get(K.profile, null)) set(K.profile, { nickname, since: Date.now() })
 }
 export const getProfile = () => get(K.profile, { nickname: '用户', since: Date.now() })
+// 头像/昵称：后端暂无资料更新接口，先存本机（头像用 saveFile 持久化临时文件）
+export const setProfile = p => set(K.profile, { ...getProfile(), ...p })
 
 // ---------- 血压 ----------
 export async function listRecords() { return (await req('/api/bp')).map(toRec) }

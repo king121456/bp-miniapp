@@ -6,8 +6,8 @@
     <view class="hero">
       <view class="ring"></view>
       <view class="top">
-        <view class="av"><image src="/static/icons/user-w.svg" /></view>
-        <view class="flex1"><view class="f20 cw b">{{ name }}</view><view class="f12 cw o8">坚持记录第 {{ days }} 天</view></view>
+        <button class="av" open-type="chooseAvatar" @chooseavatar="onAvatar"><image v-if="avatar" class="avi" :src="avatar" mode="aspectFill" /><image v-else src="/static/icons/user-w.svg" /><view class="ave"><image src="/static/icons/edit-g.svg" /></view></button>
+        <view class="flex1"><view class="f20 cw b nmv" @tap="editName">{{ name }}<image src="/static/icons/edit-w.svg" /></view><view class="f12 cw o8">坚持记录第 {{ days }} 天</view></view>
         <view class="badge f10">隐私协议 v{{ ver }}</view>
       </view>
       <view class="stats">
@@ -36,20 +36,21 @@
     <view class="danger f14" @tap="logout"><image src="/static/icons/trash-6.svg" />删除全部数据并注销</view>
     <view class="f10 c9 ft">本工具仅用于记录，不提供诊断建议</view>
 
+    <view class="mask" v-if="nmOpen" @tap="nmOpen = false"><view class="modal" @tap.stop><view class="f16 c0 b mt">修改昵称</view><view class="nmb"><input class="nmi f16 c0" type="nickname" v-model="nmIn" maxlength="16" placeholder="输入或使用微信昵称" placeholder-class="phc" @blur="e => nmIn = e.detail.value" /></view><view class="mbr"><view class="mb f16 c9 flex1" @tap="nmOpen = false">取消</view><view class="mb f16 cg b flex1" @tap="saveName">保存</view></view></view></view>
     <view class="mask" v-if="json" @tap="json = ''"><view class="modal" @tap.stop><view class="f16 c0 b mt">导出数据</view><scroll-view scroll-y class="jb"><text class="f10 c6" user-select>{{ json }}</text></scroll-view><view class="mb f16 cg b" @tap="json = ''">完成</view></view></view>
   </view>
 </template>
 <script>
-import { getVisit, listPatients, setRole, guard, getProfile, listRecords, listMedDefs, listFamily, getRemind, exportData, deleteAccount, getConsent, dayKey } from '../../api.js'
+import { setProfile, getVisit, listPatients, setRole, guard, getProfile, listRecords, listMedDefs, listFamily, getRemind, exportData, deleteAccount, getConsent, dayKey } from '../../api.js'
 export default {
-  data: () => ({ visit: '', pats: 0, name: '', total: 0, days: 0, meds: 0, fam: 0, rem: '', json: '', ver: '' }),
+  data: () => ({ visit: '', pats: 0, name: '', total: 0, days: 0, meds: 0, fam: 0, rem: '', json: '', ver: '', avatar: '', nmOpen: false, nmIn: '' }),
   computed: { g1() { return [
     { t: '用药管理', i: 'pill-g', bg: 'bg-g', u: '/pages/meds/meds', s: this.meds ? this.meds + ' 种药' : '未添加' },
     { t: '测量提醒', i: 'bell-b', bg: 'bg-b', u: '/pages/remind/remind', s: this.rem },
     { t: '家人共享', i: 'family-o', bg: 'bg-o', u: '/pages/family/family', s: this.fam ? this.fam + ' 位家人' : '未绑定' }] } },
   async onShow() {
     if (!guard()) return
-    this.name = getProfile().nickname; this.ver = (getConsent() || {}).version
+    const pf = getProfile(); this.name = pf.nickname; this.avatar = pf.avatar || ''; this.ver = (getConsent() || {}).version
     const r = await listRecords(); this.total = r.length; this.days = new Set(r.map(x => dayKey(x.time))).size
     this.meds = (await listMedDefs()).length; this.fam = (await listFamily()).length
     const v = await getVisit(); this.visit = v ? v.date.slice(5).replace('-', '/') + ' 复诊' : '未设置'
@@ -58,6 +59,16 @@ export default {
   },
   methods: {
     go(url) { uni.navigateTo({ url }) },
+    onAvatar(e) {
+      const p = e.detail && e.detail.avatarUrl; if (!p) return
+      const done = fp => { this.avatar = fp; setProfile({ avatar: fp }) }
+      uni.saveFile({ tempFilePath: p, success: r => done(r.savedFilePath), fail: () => done(p) })
+    },
+    editName() { this.nmIn = this.name; this.nmOpen = true },
+    saveName() {
+      const n = (this.nmIn || '').trim(); if (!n) return uni.showToast({ title: '昵称不能为空', icon: 'none' })
+      this.name = n; setProfile({ nickname: n }); this.nmOpen = false; uni.showToast({ title: '已保存', icon: 'none' })
+    },
     toFamily() { setRole('family'); uni.reLaunch({ url: '/pages/family/home' }) },
     async exp() {
       const s = JSON.stringify(await exportData(), null, 2)
@@ -82,7 +93,12 @@ export default {
 .ring { position: absolute; right: -60rpx; top: -100rpx; width: 340rpx; height: 340rpx; border-radius: 50%; border: 52rpx solid rgba(255,255,255,.09); }
 .top { position: relative; display: flex; align-items: center; gap: 24rpx; }
 .av { width: 112rpx; height: 112rpx; border-radius: 56rpx; background: rgba(255,255,255,.22); border: 4rpx solid rgba(255,255,255,.55); display: flex; align-items: center; justify-content: center; }
-.av image { width: 60rpx; height: 60rpx; }
+.av { position: relative; padding: 0; margin: 0; line-height: 1; flex: none; overflow: visible; } .av::after { border: none; }
+.av image { width: 60rpx; height: 60rpx; } .av .avi { width: 104rpx; height: 104rpx; border-radius: 52rpx; }
+.ave { position: absolute; right: -6rpx; bottom: -6rpx; width: 40rpx; height: 40rpx; border-radius: 20rpx; background: #fff; display: flex; align-items: center; justify-content: center; box-shadow: 0 4rpx 10rpx rgba(16,60,48,.15); } .ave image { width: 24rpx; height: 24rpx; }
+.nmv { display: flex; align-items: center; gap: 10rpx; } .nmv image { width: 30rpx; height: 30rpx; opacity: .85; }
+.nmb { padding: 16rpx 40rpx 36rpx; } .nmi { height: 88rpx; background: #F5F7F6; border-radius: 20rpx; padding: 0 24rpx; }
+.mbr { display: flex; border-top: 1rpx solid #EEF1F0; } .mbr .mb { border-top: none; } .mbr .mb + .mb { border-left: 1rpx solid #EEF1F0; } .flex1 { flex: 1; }
 .badge { color: #fff; background: rgba(255,255,255,.2); padding: 6rpx 16rpx; border-radius: 20rpx; }
 .stats { position: relative; display: flex; margin-top: 36rpx; padding-top: 24rpx; border-top: 1rpx solid rgba(255,255,255,.3); }
 .st { flex: 1; text-align: center; } .st + .st { border-left: 1rpx solid rgba(255,255,255,.25); }
