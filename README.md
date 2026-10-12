@@ -33,7 +33,7 @@ VITE_API_BASE=https://api.example.com npm run build:mp-weixin
 # 或在 miniapp/ 下参照 .env.example 新建 .env.production.local（已被 .gitignore 忽略，不要提交）
 VITE_API_BASE=https://api.example.com
 ```
-- 小程序端用 `uni.login` 拿 code 调 `/api/auth/login`。H5 没有微信登录（只会发送占位 code `h5-dev`），后端配置了真实 AppID，H5 无法登录本地后端；本地联调请用微信开发者工具或真机。
+- 登录：`uni.login` 拿 code 调 `/api/auth/login`，后端走真实微信登录。本地联调请用微信开发者工具或真机。
 - 订阅消息模板 ID 填在 `src/api.js` 的 `SUBSCRIBE_TMPL_IDS`（与后端 `WX_TPL_*` 一致）。
 - 用 HBuilderX 时可以在运行配置里设置同样的环境变量。
 

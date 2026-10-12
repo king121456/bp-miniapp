@@ -48,10 +48,8 @@ export const getConsent = () => uni.getStorageSync(K.consent) || null
 export function guard() { if (!hasConsent()) { uni.reLaunch({ url: '/pages/login/login' }); return false } return true }
 export async function login(nickname = '王阿姨') {
   const consent = { agreedAt: Date.now(), version: CONSENT_VERSION }
-  let code = 'h5-dev' // H5 无微信登录，占位 code；配置真实 AppID 的后端不会接受，联调请用微信开发者工具或真机
-  // #ifdef MP-WEIXIN
-  code = (await uni.login({ provider: 'weixin' })).code
-  // #endif
+  let code
+  try { code = (await uni.login({ provider: 'weixin' })).code } catch (e) { uni.showToast({ title: '微信登录失败，请稍后再试', icon: 'none' }); throw e }
   const r = await req('/api/auth/login', 'POST', { code, nickname, consent })
   set('token', r.token)
   set(K.consent, consent)
