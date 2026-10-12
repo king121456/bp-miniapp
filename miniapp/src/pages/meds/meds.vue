@@ -11,8 +11,8 @@
       </view>
     </view>
     <view class="pad"><view class="btn" @tap="edit('')">添加药品</view></view>
-    <view class="sh"><text class="t">服药历史</text><text class="f12 c9">近 {{ days }} 天 · 7 天内未打卡可补记</text></view>
-    <med-history :slots="slots" @pick="s => pick = s" />
+    <view class="sh"><text class="t">服药历史</text><text class="f12 c9">近 {{ days }} 天 · 7 天内未打卡、未服可补记</text></view>
+    <med-history :slots="slots" @pick="s => pick = s" @changed="reload" />
     <view v-if="days < 30" class="more f12 cg" @tap="more">查看更早记录</view>
     <slot-sheet :item="pick" @close="pick = null" @done="reload" />
   </view>

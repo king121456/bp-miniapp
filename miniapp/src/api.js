@@ -5,7 +5,7 @@ export const USE_LOCAL = String(ENV.VITE_USE_LOCAL ?? 'true') !== 'false'
 const BASE = (ENV.VITE_API_BASE || '').replace(/\/$/, '')
 // 订阅消息模板 ID（公众平台申请后填入，与后端 WX_TPL_* 对应）
 export const SUBSCRIBE_TMPL_IDS = []
-const K = { rec: 'bp_records', consent: 'health_consent', meds: 'meds', checkin: 'med_checkin', remind: 'measure_remind', family: 'family_members', invite: 'family_invite', profile: 'profile', seeded: 'demo_seeded', visits: 'visits', role: 'role', fpatients: 'family_patients' }
+const K = { rec: 'bp_records', consent: 'health_consent', meds: 'meds', checkin: 'med_checkin', remind: 'measure_remind', family: 'family_members', invite: 'family_invite', profile: 'profile', seeded: 'demo_seeded', visits: 'visits', role: 'role', fpatients: 'family_patients', skip: 'med_skip' }
 export const CONSENT_VERSION = '1.0'
 const get = (k, d = []) => { const v = uni.getStorageSync(k); return v === '' || v == null ? d : v }
 const set = (k, v) => uni.setStorageSync(k, v)
@@ -92,7 +92,8 @@ export function validate({ sys, dia, hr }) {
 }
 
 // ---------- 用药 ----------
-// 本地打卡记录：{ medId, time(计划时段 HH:MM), date(计划日期 YYYY-MM-DD), at(打卡/补记操作时间), makeup?, recordedAt?, takenTime?, fromStatus? }
+// 本地打卡记录：{ medId, time(计划时段 HH:MM), date(计划日期 YYYY-MM-DD), at(打卡/补记操作时间), makeup?, recordedAt?, fromStatus? }
+// 本地「没吃」标记（V1.3）：med_skip [{ medId, date, time, at }]
 // 药品软删除（deletedAt），停用/删除后其 7 天内历史时段仍可补记（PRD 5.8）
 export const MAKEUP_DAYS = 7 // 可补记天数（含今天）【可调整】
 export const MISS_WINDOW_MIN = 120 // 漏服判定窗口：计划时间后 2 小时仍未打卡视为漏服【可调整】
@@ -109,9 +110,10 @@ export async function deleteMed(id) {
   if (!USE_LOCAL) return req('/api/meds/' + id, 'DELETE')
   set(K.meds, get(K.meds).map(x => x.id === id ? { ...x, deletedAt: Date.now() } : x)); return {}
 }
-// 由用药计划 + 打卡记录推算时段状态：taken 已服 / missed 漏服 / pending 待服（窗口内） / future 未到时间
-export function computeSlots(meds, cks, days = MAKEUP_DAYS, now = Date.now()) {
-  const n = new Date(now), out = [], map = {}
+// 由用药计划 + 打卡记录推算时段状态：taken 已服 / skipped 未服（主动点了没吃） / missed 漏服 / pending 待服（窗口内） / future 未到时间
+export function computeSlots(meds, cks, days = MAKEUP_DAYS, now = Date.now(), skips = []) {
+  const n = new Date(now), out = [], map = {}, sk = {}
+  for (const k of skips) sk[k.medId + '@' + k.date + '@' + k.time] = 1
   for (const c of cks) map[c.medId + '@' + slotDate(c) + '@' + c.time] = c
   const lim = new Date(n.getFullYear(), n.getMonth(), n.getDate() - (MAKEUP_DAYS - 1)).getTime()
   for (let i = 0; i < days; i++) {
@@ -121,28 +123,31 @@ export function computeSlots(meds, cks, days = MAKEUP_DAYS, now = Date.now()) {
       if (m.createdAt && sched < new Date(new Date(m.createdAt).setHours(0, 0, 0, 0)).getTime()) continue
       if (m.deletedAt && sched > m.deletedAt) continue
       const c = map[m.id + '@' + date + '@' + t]
-      const status = c ? 'taken' : sched > now ? 'future' : now - sched < MISS_WINDOW_MIN * 6e4 ? 'pending' : 'missed'
-      out.push({ medId: m.id, name: m.name, dose: m.dose || '', date, time: t, sched, status, checkedAt: c ? c.at : null, makeup: !!(c && c.makeup), recordedAt: c && c.makeup ? (c.recordedAt || c.at) : null, takenTime: (c && c.takenTime) || '', deleted: !!m.deletedAt,
-        canMakeup: !c && status === 'missed' && sched >= lim, canUndo: !!(c && c.makeup) && sched >= lim })
+      const raw = sched > now ? 'future' : now - sched < MISS_WINDOW_MIN * 6e4 ? 'pending' : 'missed'
+      const status = c ? 'taken' : sk[m.id + '@' + date + '@' + t] && raw !== 'future' ? 'skipped' : raw, inWin = sched >= lim
+      out.push({ medId: m.id, name: m.name, dose: m.dose || '', date, time: t, sched, status, checkedAt: c ? c.at : null, makeup: !!(c && c.makeup), recordedAt: c && c.makeup ? (c.recordedAt || c.at) : null, deleted: !!m.deletedAt,
+        canMakeup: (status === 'missed' || status === 'skipped') && inWin, canUndo: !!(c && c.makeup) && inWin,
+        canSkip: (status === 'pending' || status === 'missed') && inWin, canUnskip: status === 'skipped' && inWin })
     }
   }
   return out.sort((a, b) => b.sched - a.sched)
 }
-const fromSlot = s => ({ ...s, status: s.status === 'upcoming' ? 'future' : s.status, sched: ms(s.scheduledAt), checkedAt: s.checkedAt ? ms(s.checkedAt) : null, recordedAt: s.recordedAt ? ms(s.recordedAt) : null, makeup: !!s.isMakeup, takenTime: s.takenTime || '', canMakeup: !!s.canMakeup, canUndo: !!s.canRevoke })
+const fromSlot = s => ({ ...s, status: s.status === 'upcoming' ? 'future' : s.status, sched: ms(s.scheduledAt), checkedAt: s.checkedAt ? ms(s.checkedAt) : null, recordedAt: s.recordedAt ? ms(s.recordedAt) : null, makeup: !!s.isMakeup, canMakeup: !!s.canMakeup, canUndo: !!s.canRevoke, canSkip: !!s.canSkip, canUnskip: !!s.canUnskip })
+const RO = s => ({ ...s, canMakeup: false, canUndo: false, canSkip: false, canUnskip: false })
 // 时段列表（含状态、补记标签），默认最近 7 天
 export async function listSlots(days = MAKEUP_DAYS) {
   if (!USE_LOCAL) return ((await req('/api/meds/history?days=' + days)) || []).map(fromSlot)
-  return computeSlots(get(K.meds), get(K.checkin), days)
+  return computeSlots(get(K.meds), get(K.checkin), days, Date.now(), get(K.skip))
 }
 export async function makeupCount() { if (!USE_LOCAL) return ((await req('/api/meds/makeup')) || {}).count || 0; return (await listMakeupSlots()).length }
 export async function listMakeupSlots() { return (await listSlots(MAKEUP_DAYS)).filter(s => s.canMakeup) }
-// 补记：只能补记最近 7 天内已过去、仍为漏服的计划时段；takenTime 选填（HH:MM）
-export async function makeupCheckin(s, takenTime = '') {
+// 补记：只能补记最近 7 天内漏服或未服的计划时段（不记录实际服药时间）
+export async function makeupCheckin(s) {
   if (!USE_LOCAL) return req('/api/meds/' + s.medId + '/makeup', 'POST', { date: s.date, time: s.time })
-  const cur = computeSlots(get(K.meds), get(K.checkin)).find(x => x.medId === s.medId && x.date === s.date && x.time === s.time)
+  const cur = computeSlots(get(K.meds), get(K.checkin), MAKEUP_DAYS, Date.now(), get(K.skip)).find(x => x.medId === s.medId && x.date === s.date && x.time === s.time)
   if (!cur || !cur.canMakeup) throw new Error('这个时段不能补记')
   const now = Date.now(), l = get(K.checkin)
-  l.push({ medId: s.medId, time: s.time, date: s.date, at: now, makeup: true, recordedAt: now, takenTime, fromStatus: 'missed' }); set(K.checkin, l)
+  l.push({ medId: s.medId, time: s.time, date: s.date, at: now, makeup: true, recordedAt: now, fromStatus: cur.status }); set(K.checkin, l)
   const log = get('makeup_log'); log.push({ op: 'makeup', medId: s.medId, date: s.date, time: s.time, at: now }); set('makeup_log', log)
   return {}
 }
@@ -152,11 +157,22 @@ export async function undoMakeup(s) {
   const log = get('makeup_log'); log.push({ op: 'revoke', medId: s.medId, date: s.date, time: s.time, at: Date.now() }); set('makeup_log', log)
   return {}
 }
+// 没吃（未服）：只能标已到点、未打卡的时段（待服或漏服），7 天内；可撤销。不触发家人漏服通知
+export async function skipSlot(s) {
+  if (!USE_LOCAL) return req('/api/meds/' + s.medId + '/skip', 'POST', { date: s.date, time: s.time })
+  const cur = computeSlots(get(K.meds), get(K.checkin), MAKEUP_DAYS, Date.now(), get(K.skip)).find(x => x.medId === s.medId && x.date === s.date && x.time === s.time)
+  if (!cur || !cur.canSkip) throw new Error('这个时段不能标记')
+  const l = get(K.skip); l.push({ medId: s.medId, date: s.date, time: s.time, at: Date.now() }); set(K.skip, l); return {}
+}
+export async function unskipSlot(s) {
+  if (!USE_LOCAL) return req('/api/meds/' + s.medId + '/skip?date=' + s.date + '&time=' + encodeURIComponent(s.time), 'DELETE')
+  set(K.skip, get(K.skip).filter(k => !(k.medId === s.medId && k.date === s.date && k.time === s.time))); return {}
+}
 // 今日用药：每种药按时间点拆成一行 { id, name, dose, time, done, status, makeup }
 export async function listMeds() {
   if (!USE_LOCAL) { const td = ymd(new Date()); return (await listSlots(1)).filter(s => s.date === td && !s.deleted).map(s => ({ ...s, id: s.medId, done: s.status === 'taken' })).sort((a, b) => a.time.localeCompare(b.time)) }
   const defs = get(K.meds), td = ymd(new Date())
-  return computeSlots(defs, get(K.checkin), 1).filter(s => s.date === td && !s.deleted).map(s => ({ ...defs.find(m => m.id === s.medId), ...s, id: s.medId, done: s.status === 'taken' })).sort((a, b) => a.time.localeCompare(b.time))
+  return computeSlots(defs, get(K.checkin), 1, Date.now(), get(K.skip)).filter(s => s.date === td && !s.deleted).map(s => ({ ...defs.find(m => m.id === s.medId), ...s, id: s.medId, done: s.status === 'taken' })).sort((a, b) => a.time.localeCompare(b.time))
 }
 export async function checkin(medId, time) {
   if (!USE_LOCAL) return req('/api/meds/' + medId + '/checkin', 'POST', { time })
@@ -272,8 +288,8 @@ export async function listPatientRecords(pid) {
 export async function patientStats(pid, range = 'week') { return req('/api/family/patients/' + pid + '/bp/stats?range=' + range) }
 // 家人只读：服药历史（含补记标签，无补记/撤销能力）
 export async function listPatientSlots(pid, days = MAKEUP_DAYS) {
-  if (USE_LOCAL) { const p = get(K.fpatients).find(x => x.id === pid); return p ? computeSlots(p.meds, p.checkins, days).map(s => ({ ...s, canMakeup: false, canUndo: false })) : [] }
-  return ((await req('/api/family/patients/' + pid + '/meds/history?days=' + days)) || []).map(fromSlot).map(s => ({ ...s, canMakeup: false, canUndo: false }))
+  if (USE_LOCAL) { const p = get(K.fpatients).find(x => x.id === pid); return p ? computeSlots(p.meds, p.checkins, days, Date.now(), p.skips || []).map(RO) : [] }
+  return ((await req('/api/family/patients/' + pid + '/meds/history?days=' + days)) || []).map(fromSlot).map(RO)
 }
 // 家人只读：仅即将到来的复诊日期、医院、科室（不含备注与历史）
 export async function getPatientVisit(pid) {
@@ -287,9 +303,9 @@ const listPatientsSync = () => get(K.fpatients).map(p => ({ name: p.name, boundA
 export async function listFamilyMessages(pid) {
   if (!USE_LOCAL) return ((await req('/api/family/messages')) || []).filter(m => !pid || m.patientId === pid).map(m => ({ ...m, createdAt: ms(m.createdAt), makeupNotes: m.makeupNotes || [] }))
   const p = get(K.fpatients).find(x => x.id === pid); if (!p) return []
-  // 本地模拟：近 7 天漏服过的时段各一条（补记的追加说明）
+  // 本地模拟：近 7 天漏服过的时段各一条（补记的追加说明）；标了「没吃」的时段不通知
   const out = []
-  for (const sl of computeSlots(p.meds, p.checkins.filter(c => !c.makeup), MAKEUP_DAYS)) if (sl.status === 'missed') {
+  for (const sl of computeSlots(p.meds, p.checkins.filter(c => !c.makeup), MAKEUP_DAYS)) if (sl.status === 'missed' && !(p.skips || []).some(k => k.medId === sl.medId && k.date === sl.date && k.time === sl.time)) {
     const mk = p.checkins.find(c => c.makeup && c.medId === sl.medId && slotDate(c) === sl.date && c.time === sl.time)
     const [, m, d] = sl.date.split('-').map(Number)
     out.push({ id: sl.medId + sl.date + sl.time, patientId: pid, date: sl.date, createdAt: sl.sched + MISS_WINDOW_MIN * 6e4, text: `${m}月${d}日 ${sl.time} 的服药尚未打卡`, makeupNotes: mk ? [`${sl.time} 的用药已于 ${fmtTime(mk.recordedAt || mk.at)} 补记`] : [] })
@@ -326,12 +342,12 @@ export async function deleteAccount() {
   if (!USE_LOCAL) await req('/api/account', 'DELETE')
   uni.clearStorageSync()
 }
-export function clearDemo() { set(K.rec, []); set(K.meds, []); set(K.checkin, []); set(K.family, []); set(K.visits, []); set(K.fpatients, []); set(K.seeded, 1) }
+export function clearDemo() { set(K.rec, []); set(K.meds, []); set(K.checkin, []); set(K.skip, []); set(K.family, []); set(K.visits, []); set(K.fpatients, []); set(K.seeded, 1) }
 
 // ---------- 示例数据 ----------
-// 生成一位示例患者的数据：近 14 天血压、2 种药、打卡（含 1 次漏服、1 次补记）
+// 生成一位示例患者的数据：近 14 天血压、2 种药、打卡（含 1 次漏服、1 次补记、1 次未服）
 function genData(seed) {
-  const now = new Date(); const recs = []; const ck = []; let s = seed
+  const now = new Date(); const recs = []; const ck = []; const sk = []; let s = seed
   const rnd = (a, b) => { s = (s * 9301 + 49297) % 233280; return a + Math.floor(s / 233280 * (b - a + 1)) }
   const tags = ['头晕', '乏力']
   for (let i = 13; i >= 0; i--) for (const [h, m] of [[8, rnd(0, 25)], [20, rnd(10, 45)]]) {
@@ -346,20 +362,21 @@ function genData(seed) {
     const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i, h, mm + rnd(0, 20)), date = ymd(d)
     if (d > now) continue
     if (i === 1 && m.id === 'm1') continue // 昨天早上：漏服，可补记
+    if (i === 3 && m.id === 'm1') { sk.push({ medId: m.id, date, time: m.times[0], at: d.getTime() + 36e5 }); continue } // 3 天前早上：未服（没吃）
     if (i === 2 && m.id === 'm2') { const at = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 21, 15).getTime(); ck.push({ medId: m.id, time: m.times[0], date, at, makeup: true, recordedAt: at, fromStatus: 'missed' }); continue }
     if (i > 7 && rnd(0, 8) === 0) continue
     ck.push({ medId: m.id, time: m.times[0], date, at: d.getTime() })
   }
-  return { recs, meds, ck }
+  return { recs, meds, ck, sk }
 }
 const dAfter = n => { const d = new Date(); return ymd(new Date(d.getFullYear(), d.getMonth(), d.getDate() + n)) }
 function genPatient(id, name, relation, seed, visitIn) {
-  const { recs, meds, ck } = genData(seed)
-  return { id, name, relation, boundAt: Date.now() - 20 * 864e5, records: recs, meds, checkins: ck, visit: visitIn != null ? { date: dAfter(visitIn), hospital: '市第一人民医院', department: '心内科', note: '带上药盒' } : null }
+  const { recs, meds, ck, sk } = genData(seed)
+  return { id, name, relation, boundAt: Date.now() - 20 * 864e5, records: recs, meds, checkins: ck, skips: sk, visit: visitIn != null ? { date: dAfter(visitIn), hospital: '市第一人民医院', department: '心内科', note: '带上药盒' } : null }
 }
 export function seedDemo() {
-  const { recs, meds, ck } = genData(7)
-  set(K.rec, recs); set(K.meds, meds); set(K.checkin, ck)
+  const { recs, meds, ck, sk } = genData(7)
+  set(K.rec, recs); set(K.meds, meds); set(K.checkin, ck); set(K.skip, sk)
   set(K.family, [{ id: 'f1', name: '小明', relation: '儿子', boundAt: Date.now() - 6 * 864e5 }, { id: 'f2', name: '小红', relation: '女儿', boundAt: Date.now() - 3 * 864e5 }])
   const now = Date.now()
   set(K.visits, [
@@ -415,7 +432,7 @@ export async function getReport(opt = {}) {
   const f = ymd(start), t = ymd(end); let planned = 0, taken = 0, makeup = 0
   // 应服 = 范围内已到时间的计划时段；已服含补记（PRD 5.6 / 5.8）
   const back = Math.round((new Date(n.getFullYear(), n.getMonth(), n.getDate()) - start) / 864e5) + 1
-  const slots = computeSlots(get(K.meds), get(K.checkin), back).filter(x => x.date >= f && x.date <= t && x.status !== 'future')
+  const slots = computeSlots(get(K.meds), get(K.checkin), back, Date.now(), get(K.skip)).filter(x => x.date >= f && x.date <= t && x.status !== 'future')
   const meds = live(get(K.meds)).map(m => {
     const mine = slots.filter(x => x.medId === m.id), p = mine.length, tk = mine.filter(x => x.status === 'taken').length
     return { name: m.name, dose: m.dose || '', times: m.times || [], planned: p, taken: tk, rate: p ? r1(tk * 100 / p) : null }

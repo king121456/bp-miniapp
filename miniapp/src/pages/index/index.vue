@@ -40,8 +40,10 @@
         <view class="ic bg-g"><image src="/static/icons/pill-g.svg" /></view>
         <view class="flex1 mn"><view class="f14 c0 b">{{ m.name }}</view><view class="f12 c9"><text class="num">{{ m.time }}</text> · {{ m.dose }}</view></view>
         <view class="ck done" v-if="m.done" @tap="m.makeup && (pick = m)"><image src="/static/icons/check-l.svg" />已服<text v-if="m.makeup" class="mk">补记</text></view>
-        <view class="ck mkb" v-else-if="m.canMakeup" @tap="pick = m">补记</view>
-        <view class="ck todo" v-else @tap="doCheck(m)">打卡</view>
+        <view class="ck sk" v-else-if="m.status === 'skipped'" @tap="pick = m">未服</view>
+        <view class="acts" v-else><text v-if="m.canSkip" class="skb" @tap="doSkip(m)">没吃</text>
+          <view class="ck mkb" v-if="m.canMakeup" @tap="pick = m">补记</view>
+          <view class="ck todo" v-else @tap="doCheck(m)">打卡</view></view>
       </view>
       <view class="miss" v-if="missCount" @tap="go('/pages/meds/makeup')"><text class="f14 c3 flex1">最近 7 天有 <text class="num b">{{ missCount }}</text> 次未打卡</text><text class="f12 cg">去补记</text><image class="arrow" src="/static/icons/right-g.svg" /></view>
     </view>
@@ -70,7 +72,7 @@
   </view>
 </template>
 <script>
-import { guard, listRecords, listMeds, checkin, listFamily, getRemind, getProfile, isToday, hhmm, weekStart, WEEK, makeupCount, getVisit, visitRemindAt, daysUntil, shouldAskNextVisit, dismissAskNextVisit, getRole } from '../../api.js'
+import { guard, listRecords, listMeds, checkin, listFamily, getRemind, getProfile, isToday, hhmm, weekStart, WEEK, makeupCount, skipSlot, getVisit, visitRemindAt, daysUntil, shouldAskNextVisit, dismissAskNextVisit, getRole } from '../../api.js'
 export default {
   data: () => ({ records: [], meds: [], famCount: 0, remind: null, name: '', now: Date.now(), missCount: 0, visit: null, askNext: false, pick: null }),
   computed: {
@@ -103,6 +105,10 @@ export default {
       this.visit = await getVisit(); this.askNext = shouldAskNextVisit()
     },
     async doCheck(m) { await checkin(m.id, m.time); uni.showToast({ title: '已打卡', icon: 'success' }); this.meds = await listMeds() },
+    async doSkip(m) {
+      try { await skipSlot(m); uni.showToast({ title: '已记为未服', icon: 'none' }); this.afterMakeup() }
+      catch (e) { uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' }) }
+    },
     async afterMakeup() { this.pick = null; this.meds = await listMeds(); this.missCount = await makeupCount() },
     md(s) { const [, m, d] = s.split('-').map(Number); return `${m}月${d}日` },
     closeAsk() { dismissAskNextVisit(); this.askNext = false },
@@ -142,6 +148,9 @@ export default {
 .ck.todo { color: #fff; background: linear-gradient(120deg, #34C9A3, #62E17D); box-shadow: 0 8rpx 20rpx -4rpx rgba(16,196,149,.5); }
 .mk { margin-left: 8rpx; background: #F2F4F3; color: #666; padding: 2rpx 12rpx; border-radius: 12rpx; font-size: 20rpx; font-weight: 400; }
 .ck.mkb { color: #10C495; background: #E3F8F1; }
+.ck.sk { color: #888; background: #EEF0EF; font-weight: 400; }
+.acts { display: flex; align-items: center; gap: 4rpx; }
+.skb { font-size: 24rpx; color: #888; padding: 12rpx 16rpx; }
 .miss { display: flex; align-items: center; gap: 8rpx; margin-top: 4rpx; padding: 24rpx 0 12rpx; border-top: 1rpx solid #F0F2F1; }
 .vt { position: relative; margin: 0 32rpx 24rpx; padding: 32rpx; border-radius: 32rpx; background: #fff; box-shadow: 0 2rpx 4rpx rgba(16,60,48,.04), 0 12rpx 40rpx rgba(16,60,48,.06); }
 .vh { display: flex; align-items: center; } .vtx { margin-left: 24rpx; }

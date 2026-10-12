@@ -108,10 +108,11 @@ export default {
       const ms = (r.meds || []).slice(0, 3)
       ms.forEach((m, i) => { const yy = y + 36 + i * 16; txt(`${m.name}${m.dose ? ' ' + m.dose : ''} · ${(m.times || []).join(' ')}`.slice(0, 28), 20, yy, 11, '#666') })
       if ((r.meds || []).length > 3) txt(`另有 ${r.meds.length - 3} 种药品未列出`, 20, y + 36 + 3 * 16, 10, C.sub)
-      // 症状
-      y = 576; txt('记录的症状', 20, y, 14, C.ink, 'left', true)
-      const sy = (r.symptoms || []).map(s => `${s.name} ${s.count} 次`).join('  ·  ') || '无'
-      txt(sy.slice(0, 30), 20, y + 18, 12, '#444')
+      // 症状（没有记录症状时整块不显示）
+      if ((r.symptoms || []).length) {
+        y = 576; txt('记录的症状', 20, y, 14, C.ink, 'left', true)
+        txt(r.symptoms.map(s => `${s.name} ${s.count} 次`).join('  ·  ').slice(0, 30), 20, y + 18, 12, '#444')
+      }
       // 页脚
       ctx.setStrokeStyle(C.line); ctx.setLineWidth(0.5); ctx.beginPath(); ctx.moveTo(20, BH - 26); ctx.lineTo(BW - 20, BH - 26); ctx.stroke()
       txt(r.footer || '数据由用户自行记录，仅供就诊参考', BW / 2, BH - 10, 10, C.sub, 'center')

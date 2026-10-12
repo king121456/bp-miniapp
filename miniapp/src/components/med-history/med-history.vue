@@ -3,22 +3,24 @@
     <view v-if="!days.length" class="card empty">暂无服药记录</view>
     <view class="card lst" v-for="d in days" :key="d.date">
       <view class="dh"><text class="f14 c0 b">{{ d.label }}</text><text class="f12 c9">已服 {{ d.taken }}/{{ d.total }}</text></view>
-      <view class="cell" v-for="s in d.items" :key="s.medId + s.time" @tap="s.makeup && $emit('pick', s)">
+      <view class="cell" v-for="s in d.items" :key="s.medId + s.time" @tap="(s.makeup || s.status === 'skipped') && $emit('pick', s)">
         <text class="num f16 c0 tm">{{ s.time }}</text>
         <view class="flex1 mn"><view class="f14 c0">{{ s.name }}</view>
           <view class="f10 c9">{{ s.dose }}<text v-if="s.status === 'taken' && !s.makeup"> · {{ hm(s.checkedAt) }} 打卡</text><text v-if="s.makeup"> · 已于 {{ ft(s.recordedAt) }} 补记</text></view></view>
         <view v-if="s.status === 'taken'" class="st ok"><image src="/static/icons/check-l.svg" />已服<text v-if="s.makeup" class="mk">补记</text></view>
-        <view v-else-if="s.canMakeup && !readonly" class="mkb" @tap.stop="$emit('pick', s)">补记</view>
+        <view v-else-if="s.status === 'skipped'" class="sk">未服</view>
+        <view v-else-if="s.canMakeup && !readonly" class="acts"><text v-if="s.canSkip" class="skb" @tap.stop="skip(s)">没吃</text><view class="mkb" @tap.stop="$emit('pick', s)">补记</view></view>
+        <view v-else-if="s.canSkip && !readonly" class="acts"><text class="skb" @tap.stop="skip(s)">没吃</text><text class="f12 c9">待服</text></view>
         <text v-else class="f12 c9">{{ s.status === 'missed' ? '未打卡' : s.status === 'pending' ? '待服' : '未到时间' }}</text>
       </view>
     </view>
   </view>
 </template>
 <script>
-import { hhmm, fmtTime, WEEK } from '../../api.js'
+import { hhmm, fmtTime, WEEK, skipSlot } from '../../api.js'
 export default {
   props: { slots: { type: Array, default: () => [] }, readonly: Boolean },
-  emits: ['pick'],
+  emits: ['pick', 'changed'],
   computed: {
     days() {
       const g = {}, out = []
@@ -32,7 +34,13 @@ export default {
       })
     }
   },
-  methods: { hm: hhmm, ft: fmtTime }
+  methods: {
+    hm: hhmm, ft: fmtTime,
+    async skip(s) {
+      try { await skipSlot(s); uni.showToast({ title: '已记为未服', icon: 'none' }); this.$emit('changed') }
+      catch (e) { uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' }) }
+    }
+  }
 }
 </script>
 <style lang="scss" scoped>
@@ -42,4 +50,7 @@ export default {
 .st { display: flex; align-items: center; gap: 6rpx; font-size: 24rpx; font-weight: 600; color: #31CD4C; } .st image { width: 24rpx; height: 24rpx; }
 .mk { margin-left: 8rpx; background: #F2F4F3; color: #666; padding: 2rpx 12rpx; border-radius: 12rpx; font-size: 20rpx; font-weight: 400; }
 .mkb { height: 64rpx; padding: 0 32rpx; border-radius: 32rpx; font-size: 28rpx; font-weight: 600; color: #10C495; background: #E3F8F1; display: flex; align-items: center; }
+.acts { display: flex; align-items: center; gap: 8rpx; }
+.skb { font-size: 24rpx; color: #888; padding: 12rpx 16rpx; }
+.sk { font-size: 24rpx; color: #888; background: #EEF0EF; padding: 4rpx 16rpx; border-radius: 12rpx; }
 </style>
