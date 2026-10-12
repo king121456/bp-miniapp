@@ -7,6 +7,9 @@ dev.env
 *.key
 /bp-server
 *.exe
+bp-server.exe
 data/
 mongo-data/
 *.log
+server.log
+bp-server.log

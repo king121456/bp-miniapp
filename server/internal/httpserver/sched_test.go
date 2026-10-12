@@ -1,4 +1,4 @@
-package main
+package httpserver
 
 import (
 	"context"
@@ -6,12 +6,16 @@ import (
 	"testing"
 	"time"
 
+	"bp-server/internal/config"
+	"bp-server/internal/model"
+	"bp-server/internal/service"
+	"bp-server/internal/wechat"
+
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-// 次数用完后提醒进待办；注销后库里查不到该用户
 func TestReminderAndDelete(t *testing.T) {
 	ctx := context.Background()
 	db := testDB(t, "bp_test")
@@ -19,35 +23,34 @@ func TestReminderAndDelete(t *testing.T) {
 	if len(key) != 64 {
 		key = "00000000000000000000000000000000000000000000000000000000000000aa"
 	}
-	db.Drop(ctx)
-	app, err := NewApp(Config{JWTSecret: "x", DataKey: key}, db)
+	_ = db.Drop(ctx)
+	app, err := service.New(config.Config{JWTSecret: "x0123456789abcdef", DataKey: key, WxAppID: "t", WxSecret: "t"}, db)
 	if err != nil {
 		t.Fatal(err)
 	}
-	app.wx = fakeWx{}
-	app.EnsureIndexes(ctx)
+	app.Wx = wechat.Fake{}
+	_ = app.EnsureIndexes(ctx)
 	uid := bson.NewObjectID()
-	db.Collection("users").InsertOne(ctx, bson.M{"_id": uid, "openid": "t"})
-	db.Collection("meds").InsertOne(ctx, bson.M{"userId": uid, "name": app.enc("药"), "times": []string{"08:00"}})
-	db.Collection("subscribe").InsertOne(ctx, bson.M{"userId": uid, "kind": "med", "remaining": 1})
-	d1 := time.Date(2026, 10, 12, 8, 0, 0, 0, CST)
-	app.tick(ctx, d1) // 有 1 次授权：推送，不进待办
+	_, _ = db.Collection("users").InsertOne(ctx, bson.M{"_id": uid, "openid": "t"})
+	_, _ = db.Collection("meds").InsertOne(ctx, bson.M{"userId": uid, "name": app.Enc("药"), "times": []string{"08:00"}})
+	_, _ = db.Collection("subscribe").InsertOne(ctx, bson.M{"userId": uid, "kind": "med", "remaining": 1})
+	d1 := time.Date(2026, 10, 12, 8, 0, 0, 0, model.CST)
+	app.Tick(ctx, d1)
 	if n, _ := db.Collection("todos").CountDocuments(ctx, bson.M{"userId": uid}); n != 0 {
 		t.Fatalf("day1 todos=%d want 0", n)
 	}
-	app.tick(ctx, d1)                  // 同一分钟重复触发不重复发
-	app.tick(ctx, d1.AddDate(0, 0, 1)) // 次数用完：进待办
+	app.Tick(ctx, d1)
+	app.Tick(ctx, d1.AddDate(0, 0, 1))
 	if n, _ := db.Collection("todos").CountDocuments(ctx, bson.M{"userId": uid}); n != 1 {
 		t.Fatalf("day2 todos=%d want 1", n)
 	}
 	for _, c := range []string{"meds", "subscribe", "todos"} {
-		db.Collection(c).DeleteMany(ctx, bson.M{"userId": uid})
+		_, _ = db.Collection(c).DeleteMany(ctx, bson.M{"userId": uid})
 	}
-	db.Collection("users").DeleteOne(ctx, bson.M{"_id": uid})
-	db.Drop(ctx)
+	_, _ = db.Collection("users").DeleteOne(ctx, bson.M{"_id": uid})
+	_ = db.Drop(ctx)
 }
 
-// testDB 连不上本地 MongoDB 时跳过测试，而不是空指针
 func testDB(t *testing.T, name string) *mongo.Database {
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -61,13 +64,4 @@ func testDB(t *testing.T, name string) *mongo.Database {
 		t.Skip("MongoDB not reachable, skipping")
 	}
 	return cli.Database(name)
-}
-
-type fakeWx struct{}
-
-func (fakeWx) Code2Session(_ context.Context, code string) (string, error) {
-	return "test_" + code, nil
-}
-func (fakeWx) SendSubscribe(context.Context, string, string, string, map[string]string) error {
-	return nil
 }

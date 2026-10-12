@@ -1,4 +1,4 @@
-package main
+package service
 
 import (
 	"net/http"
@@ -6,22 +6,22 @@ import (
 	"strconv"
 	"time"
 
+	"bp-server/internal/model"
+
 	"go.mongodb.org/mongo-driver/v2/bson"
 	"go.mongodb.org/mongo-driver/v2/mongo/options"
 )
 
-// GET /api/report?days=7|30|90  或  ?from=2026-09-01&to=2026-09-30（最长 90 天）
-// 只给本人用，家人没有对应接口；服务端不生成、不保存图片，只返回数字。
-func (a *App) report(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) {
+func (a *App) Report(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) {
 	q := r.URL.Query()
-	now := time.Now().In(CST)
-	end := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, CST)
+	now := time.Now().In(model.CST)
+	end := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, model.CST)
 	var start time.Time
 	if q.Get("from") != "" || q.Get("to") != "" {
-		f, e1 := time.ParseInLocation("2006-01-02", q.Get("from"), CST)
-		t, e2 := time.ParseInLocation("2006-01-02", q.Get("to"), CST)
+		f, e1 := time.ParseInLocation("2006-01-02", q.Get("from"), model.CST)
+		t, e2 := time.ParseInLocation("2006-01-02", q.Get("to"), model.CST)
 		if e1 != nil || e2 != nil || t.Before(f) || t.Sub(f) > 89*24*time.Hour {
-			fail(w, 400, "from/to invalid or longer than 90 days")
+			Fail(w, 400, "from/to invalid or longer than 90 days")
 			return
 		}
 		start, end = f, t
@@ -31,7 +31,7 @@ func (a *App) report(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) 
 			days = 30
 		}
 		if days != 7 && days != 30 && days != 90 {
-			fail(w, 400, "days must be 7, 30 or 90")
+			Fail(w, 400, "days must be 7, 30 or 90")
 			return
 		}
 		start = end.AddDate(0, 0, -(days - 1))
@@ -41,14 +41,14 @@ func (a *App) report(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) 
 
 	cur, err := a.C("bp_records").Find(r.Context(), bson.M{"userId": uid, "time": bson.M{"$gte": start, "$lt": stop}}, options.Find().SetSort(bson.M{"time": 1}))
 	if err != nil {
-		fail(w, 500, "db error")
+		Fail(w, 500, "db error")
 		return
 	}
-	var recs []BP
-	cur.All(r.Context(), &recs)
+	var recs []model.BP
+	_ = cur.All(r.Context(), &recs)
 
 	type acc struct{ s, d, h, hn, n int }
-	add := func(x *acc, b BP) {
+	add := func(x *acc, b model.BP) {
 		x.s += b.Sys
 		x.d += b.Dia
 		x.n++
@@ -61,9 +61,9 @@ func (a *App) report(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) 
 		if x == nil || x.n == 0 {
 			return nil
 		}
-		m := map[string]any{"sys": round1(float64(x.s) / float64(x.n)), "dia": round1(float64(x.d) / float64(x.n)), "hr": nil, "count": x.n}
+		m := map[string]any{"sys": model.Round1(float64(x.s) / float64(x.n)), "dia": model.Round1(float64(x.d) / float64(x.n)), "hr": nil, "count": x.n}
 		if x.hn > 0 {
-			m["hr"] = round1(float64(x.h) / float64(x.hn))
+			m["hr"] = model.Round1(float64(x.h) / float64(x.hn))
 		}
 		return m
 	}
@@ -71,7 +71,7 @@ func (a *App) report(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) 
 	dayAM, dayPM := map[string]*acc{}, map[string]*acc{}
 	symptoms := map[string]int{}
 	for _, b := range recs {
-		t := b.Time.In(CST)
+		t := b.Time.In(model.CST)
 		k := t.Format("2006-01-02")
 		add(&all, b)
 		tgt := dayPM
@@ -100,19 +100,17 @@ func (a *App) report(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) 
 	}
 	sort.Slice(sym, func(i, j int) bool { return sym[i]["count"].(int) > sym[j]["count"].(int) })
 
-	// 用药与完成率：计划次数按药品当前的服药时间点 × 天数估算
-	var full []medFull
+	var full []model.MedFull
 	mc, _ := a.C("meds").Find(r.Context(), bson.M{"userId": uid})
-	mc.All(r.Context(), &full)
+	_ = mc.All(r.Context(), &full)
 	medOut := []map[string]any{}
 	planned, taken, makeups := 0, 0, 0
 	for _, m := range full {
-		// 按每天生效的计划版本累加应服次数，删除后的日子不算
 		p := 0
 		for i := 0; i < ndays; i++ {
 			d := start.AddDate(0, 0, i).Format("2006-01-02")
-			for _, t := range m.timesOn(d) {
-				if slotExists(m, d, t) {
+			for _, t := range m.TimesOn(d) {
+				if SlotExists(m, d, t) {
 					p++
 				}
 			}
@@ -129,15 +127,15 @@ func (a *App) report(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) 
 		makeups += int(mk)
 		var rate any
 		if p > 0 {
-			rate = round1(float64(n) * 100 / float64(p))
+			rate = model.Round1(float64(n) * 100 / float64(p))
 		}
-		medOut = append(medOut, map[string]any{"name": a.dec(m.Name), "dose": a.dec(m.Dose), "times": m.Times, "planned": p, "taken": n, "rate": rate, "makeup": mk})
+		medOut = append(medOut, map[string]any{"name": a.Dec(m.Name), "dose": a.Dec(m.Dose), "times": m.Times, "planned": p, "taken": n, "rate": rate, "makeup": mk})
 	}
 	var totalRate any
 	if planned > 0 {
-		totalRate = round1(float64(taken) * 100 / float64(planned))
+		totalRate = model.Round1(float64(taken) * 100 / float64(planned))
 	}
-	ok(w, map[string]any{
+	OK(w, map[string]any{
 		"from": start.Format("2006-01-02"), "to": end.Format("2006-01-02"), "days": ndays,
 		"generatedAt": now,
 		"average":     fin(&all), "morning": fin(&am), "evening": fin(&pm), "count": all.n,
