@@ -3,7 +3,7 @@
 运行：`cp .env.example .env` 填好后 `set -a; . ./.env; go run .`。Go 1.22+，MongoDB 4.4+。
 
 统一返回 `{ "code": 0, "data": ... }`，出错为 `{ "code": <HTTP状态>, "message": "..." }`。
-除登录外都需请求头 `Authorization: Bearer <token>`（30 天有效）。时间统一以 +08:00 的 RFC3339 返回，按北京时间计算"今天"。
+新增的订阅 kind：`visit`。除登录外都需请求头 `Authorization: Bearer <token>`（30 天有效）。时间统一以 +08:00 的 RFC3339 返回，按北京时间计算"今天"。
 备注、药名、剂量在库里用 AES-256-GCM 加密存储。
 
 ## 登录
@@ -44,6 +44,29 @@
 - 返回 `{ from, to, days, generatedAt, average, morning, evening, count, series: [{ date, morning, evening }], meds: [{ name, dose, times, planned, taken, rate }], adherence: { planned, taken, rate }, symptoms: [{ name, count }], footer }`。
 - 完成率按药品当前的服药时间点乘以天数估算计划次数，rate 为百分比。
 - 只限本人调用，家人没有对应接口。服务端只返回数字，图片由前端用 canvas 画，服务端不保存。姓名不经过后端。
+
+## 漏服补记（V1.2 5.8）
+时段状态：`upcoming` 还没到点，`pending` 待服（计划时间后 `MISS_WINDOW_MINUTES` 内，默认 120 分钟），`missed` 漏服，`taken` 已服。
+- `GET /api/meds/history?days=7`（最多 90）→ 每个计划时段 `{ medId, name, dose, date, time, scheduledAt, status, isMakeup, checkedAt?, recordedAt?, canMakeup, canRevoke, deleted }`，按时间倒序。
+- `GET /api/meds/makeup` → `{ days, count, items }`，首页"最近 7 天有 N 次未打卡"用 `count`。
+- `POST /api/meds/:id/makeup` `{ date: "2026-10-11", time: "08:00" }` → `{ status: "taken", isMakeup: true, recordedAt, scheduledAt }`。只能补最近 `MAKEUP_WINDOW_DAYS`（默认 7，含今天）内已漏服的计划时段；未来、待服、已服、计划外的时段返回 400，重复补记返回 409。
+- `DELETE /api/meds/:id/makeup?date=&time=` 撤销补记，恢复为漏服，写操作日志。
+- 普通打卡 `POST /api/meds/:id/checkin` 遇到已漏服的时段返回 409 `slot missed, use makeup`。
+- 删除药品改为软删除，删除前的历史时段仍能补记。
+- 家人：`GET /api/family/patients/:pid/meds/history` 只读，同样能看到 `isMakeup`，没有 `canMakeup/canRevoke`。补记接口家人调用返回 404。
+- 家人站内消息 `GET /api/family/messages` → `[{ id, patientId, date, text, createdAt, makeupNotes: ["08:00 的用药已于 10月11日 21:15 补记"] }]`。补记不撤回已发通知，也不另发订阅消息；判定时已补记的时段不会进通知。
+- 就诊报告 `adherence` 多了 `makeup`（其中补记次数），每种药也有 `makeup`。
+
+## 复诊日提醒（V1.2 5.9）
+- `GET /api/visits` → `{ upcoming, history }`。每项 `{ id, visitDate, hospital, department, note, remindTime, remindAt, status, pushStatus, todoId? }`，status 为 `upcoming / past / cancelled`。
+- `POST /api/visits` `{ visitDate, hospital?, department?, note?, remindTime?: "19:00", replace?: false }` → `{ visit, needSubscribe }`。
+  已有即将到来的复诊时返回 409，`data` 是原复诊，用来弹"已有 X月X日 的复诊，要改成新的日期吗？"，确认后带 `replace: true` 再提交，原复诊变为已取消。
+  日期范围今天到 `VISIT_MAX_DAYS`（默认 365）天内；医院 30 字、科室 20 字、备注 100 字以内。
+- `PUT /api/visits/:id` 修改，按新时间重新安排提醒。`POST /api/visits/:id/cancel` 取消。`DELETE /api/visits/:id` 删除（含历史）。
+- 提醒在复诊前一天 `remindTime` 发，按订阅次数规则推送（模板 `WX_TPL_VISIT`，kind 为 `visit`）。无论推送成功与否都生成一条复诊待办，`kind: "visit"`，带 `visitDate` 和 `action: "report"`，前端据此显示"生成就诊卡片"按钮，跳转时用 `GET /api/report?from=<今天-29天>&to=<今天>`。
+  保存时复诊就是今天或已过提醒时间，不推送（`pushStatus: "skipped"`），直接生成待办。复诊当天结束后待办过期，复诊状态改为 `past`。
+- 家人：`GET /api/family/patients/:pid/visit` 只返回 `{ visitDate, hospital, department }`，没有备注和历史；家人不收复诊提醒，写接口一律 404。
+- MongoDB 对 `patientId` 建了部分唯一索引（`status = upcoming`），保证同一时间只有一个即将到来的复诊。
 
 ## 账号
 - `GET /api/account/export` 导出全部数据为 JSON。

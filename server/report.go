@@ -102,21 +102,24 @@ func (a *App) report(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) 
 
 	// 用药与完成率：计划次数按药品当前的服药时间点 × 天数估算
 	var meds []Med
-	mc, _ := a.C("meds").Find(r.Context(), bson.M{"userId": uid})
+	mc, _ := a.C("meds").Find(r.Context(), bson.M{"userId": uid, "deletedAt": nil})
 	mc.All(r.Context(), &meds)
 	medOut := []map[string]any{}
-	planned, taken := 0, 0
+	planned, taken, makeups := 0, 0, 0
 	for _, m := range meds {
 		p := len(m.Times) * ndays
 		n, _ := a.C("checkins").CountDocuments(r.Context(), bson.M{"userId": uid, "medId": m.ID,
 			"date": bson.M{"$gte": start.Format("2006-01-02"), "$lte": end.Format("2006-01-02")}})
+		mk, _ := a.C("checkins").CountDocuments(r.Context(), bson.M{"userId": uid, "medId": m.ID, "isMakeup": true,
+			"date": bson.M{"$gte": start.Format("2006-01-02"), "$lte": end.Format("2006-01-02")}})
 		planned += p
 		taken += int(n)
+		makeups += int(mk)
 		var rate any
 		if p > 0 {
 			rate = round1(float64(n) * 100 / float64(p))
 		}
-		medOut = append(medOut, map[string]any{"name": a.dec(m.Name), "dose": a.dec(m.Dose), "times": m.Times, "planned": p, "taken": n, "rate": rate})
+		medOut = append(medOut, map[string]any{"name": a.dec(m.Name), "dose": a.dec(m.Dose), "times": m.Times, "planned": p, "taken": n, "rate": rate, "makeup": mk})
 	}
 	var totalRate any
 	if planned > 0 {
@@ -127,7 +130,7 @@ func (a *App) report(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) 
 		"generatedAt": now,
 		"average":     fin(&all), "morning": fin(&am), "evening": fin(&pm), "count": all.n,
 		"series": series, "meds": medOut,
-		"adherence": map[string]any{"planned": planned, "taken": taken, "rate": totalRate},
+		"adherence": map[string]any{"planned": planned, "taken": taken, "makeup": makeups, "rate": totalRate},
 		"symptoms":  sym,
 		"footer":    "数据由用户自行记录，仅供就诊参考",
 	})

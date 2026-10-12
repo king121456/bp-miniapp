@@ -52,6 +52,18 @@ func (a *App) Routes() http.Handler {
 	m.HandleFunc("GET /api/family/patients/{pid}/bp/stats", a.auth(a.familyStats))
 
 	m.HandleFunc("GET /api/report", a.auth(a.report))
+	m.HandleFunc("GET /api/meds/history", a.auth(a.medHistory))
+	m.HandleFunc("GET /api/meds/makeup", a.auth(a.makeupCandidates))
+	m.HandleFunc("POST /api/meds/{id}/makeup", a.auth(a.makeup))
+	m.HandleFunc("DELETE /api/meds/{id}/makeup", a.auth(a.revokeMakeup))
+	m.HandleFunc("GET /api/visits", a.auth(a.listVisits))
+	m.HandleFunc("POST /api/visits", a.auth(a.createVisit))
+	m.HandleFunc("PUT /api/visits/{id}", a.auth(a.updateVisit))
+	m.HandleFunc("POST /api/visits/{id}/cancel", a.auth(a.cancelVisit))
+	m.HandleFunc("DELETE /api/visits/{id}", a.auth(a.deleteVisit))
+	m.HandleFunc("GET /api/family/patients/{pid}/meds/history", a.auth(a.familyMedHistory))
+	m.HandleFunc("GET /api/family/patients/{pid}/visit", a.auth(a.familyVisit))
+	m.HandleFunc("GET /api/family/messages", a.auth(a.familyMessages))
 	m.HandleFunc("GET /api/account/export", a.auth(a.export))
 	m.HandleFunc("DELETE /api/account", a.auth(a.deleteAccount))
 	return withCORS(m)
@@ -352,7 +364,7 @@ func (a *App) medIn(r *http.Request) (Med, bool) {
 }
 
 func (a *App) listMeds(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) {
-	cur, err := a.C("meds").Find(r.Context(), bson.M{"userId": uid})
+	cur, err := a.C("meds").Find(r.Context(), bson.M{"userId": uid, "deletedAt": nil})
 	if err != nil {
 		fail(w, 500, "db error")
 		return
@@ -414,7 +426,7 @@ func (a *App) updateMed(w http.ResponseWriter, r *http.Request, uid bson.ObjectI
 		fail(w, 400, "invalid input")
 		return
 	}
-	res, err := a.C("meds").UpdateOne(r.Context(), bson.M{"_id": id, "userId": uid},
+	res, err := a.C("meds").UpdateOne(r.Context(), bson.M{"_id": id, "userId": uid, "deletedAt": nil},
 		bson.M{"$set": bson.M{"name": a.enc(m.Name), "dose": a.enc(m.Dose), "times": m.Times}})
 	if err != nil || res.MatchedCount == 0 {
 		fail(w, 404, "not found")
@@ -425,12 +437,12 @@ func (a *App) updateMed(w http.ResponseWriter, r *http.Request, uid bson.ObjectI
 
 func (a *App) deleteMed(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) {
 	id, _ := bson.ObjectIDFromHex(r.PathValue("id"))
-	res, err := a.C("meds").DeleteOne(r.Context(), bson.M{"_id": id, "userId": uid})
-	if err != nil || res.DeletedCount == 0 {
+	// 软删除：历史打卡和补记时限内的历史时段仍保留
+	res, err := a.C("meds").UpdateOne(r.Context(), bson.M{"_id": id, "userId": uid, "deletedAt": nil}, bson.M{"$set": bson.M{"deletedAt": time.Now()}})
+	if err != nil || res.MatchedCount == 0 {
 		fail(w, 404, "not found")
 		return
 	}
-	a.C("checkins").DeleteMany(r.Context(), bson.M{"userId": uid, "medId": id})
 	ok(w, nil)
 }
 
@@ -446,7 +458,7 @@ func (a *App) checkin(w http.ResponseWriter, r *http.Request, uid bson.ObjectID)
 	}
 	readJSON(r, &in)
 	var m Med
-	if a.C("meds").FindOne(r.Context(), bson.M{"_id": id, "userId": uid}).Decode(&m) != nil {
+	if a.C("meds").FindOne(r.Context(), bson.M{"_id": id, "userId": uid, "deletedAt": nil}).Decode(&m) != nil {
 		fail(w, 404, "not found")
 		return
 	}
@@ -463,8 +475,15 @@ func (a *App) checkin(w http.ResponseWriter, r *http.Request, uid bson.ObjectID)
 		fail(w, 400, "time must be one of the med's times")
 		return
 	}
+	if slotStatus(today(), in.Time, time.Now().In(CST), false) == "missed" {
+		var c bson.M
+		if a.C("checkins").FindOne(r.Context(), bson.M{"userId": uid, "medId": id, "date": today(), "slot": in.Time}).Decode(&c) != nil {
+			fail(w, 409, "slot missed, use makeup")
+			return
+		}
+	}
 	_, err = a.C("checkins").UpdateOne(r.Context(), bson.M{"userId": uid, "medId": id, "date": today(), "slot": in.Time},
-		bson.M{"$setOnInsert": bson.M{"at": time.Now()}}, options.UpdateOne().SetUpsert(true))
+		bson.M{"$setOnInsert": bson.M{"at": time.Now(), "isMakeup": false, "scheduledAt": scheduledAt(today(), in.Time)}}, options.UpdateOne().SetUpsert(true))
 	if err != nil {
 		fail(w, 500, "db error")
 		return
@@ -522,10 +541,10 @@ func (a *App) putMeasure(w http.ResponseWriter, r *http.Request, uid bson.Object
 	ok(w, m)
 }
 
-var kinds = map[string]bool{"measure": true, "med": true, "family": true}
+var kinds = map[string]bool{"measure": true, "med": true, "family": true, "visit": true}
 
 func (a *App) tpl(kind string) string {
-	return map[string]string{"measure": a.cfg.TplMeasure, "med": a.cfg.TplMed, "family": a.cfg.TplFamily}[kind]
+	return map[string]string{"measure": a.cfg.TplMeasure, "med": a.cfg.TplMed, "family": a.cfg.TplFamily, "visit": a.cfg.TplVisit}[kind]
 }
 
 // called by frontend after wx.requestSubscribeMessage returns "accept"
@@ -554,7 +573,7 @@ func (a *App) grants(r *http.Request, uid bson.ObjectID) map[string]int {
 		N    int    `bson:"remaining"`
 	}
 	cur.All(r.Context(), &gs)
-	out := map[string]int{"measure": 0, "med": 0, "family": 0}
+	out := map[string]int{"measure": 0, "med": 0, "family": 0, "visit": 0}
 	for _, g := range gs {
 		out[g.Kind] = g.N
 	}
@@ -714,13 +733,15 @@ func (a *App) export(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) 
 // hard delete everything belonging to the user
 func (a *App) deleteAccount(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) {
 	ctx := r.Context()
-	for _, c := range []string{"bp_records", "meds", "checkins", "subscribe", "todos"} {
+	for _, c := range []string{"bp_records", "meds", "checkins", "subscribe", "todos", "op_log"} {
 		if _, err := a.C(c).DeleteMany(ctx, bson.M{"userId": uid}); err != nil {
 			fail(w, 500, "db error")
 			return
 		}
 	}
 	a.C("invites").DeleteMany(ctx, bson.M{"patientId": uid})
+	a.C("visits").DeleteMany(ctx, bson.M{"patientId": uid})
+	a.C("family_msgs").DeleteMany(ctx, bson.M{"$or": bson.A{bson.M{"patientId": uid}, bson.M{"memberId": uid}}})
 	a.C("family").DeleteMany(ctx, bson.M{"$or": bson.A{bson.M{"patientId": uid}, bson.M{"memberId": uid}}})
 	a.C("users").DeleteOne(ctx, bson.M{"_id": uid})
 	ok(w, nil)

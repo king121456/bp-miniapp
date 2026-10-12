@@ -145,3 +145,5 @@ func fail(w http.ResponseWriter, status int, msg string) {
 func readJSON(r *http.Request, v any) error {
 	return json.NewDecoder(http.MaxBytesReader(nil, r.Body, 1<<20)).Decode(v)
 }
+
+func writeJSON(w http.ResponseWriter, v any) { json.NewEncoder(w).Encode(v) }

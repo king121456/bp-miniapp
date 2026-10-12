@@ -47,7 +47,7 @@ func (a *App) tick(ctx context.Context, now time.Time) {
 	}
 
 	// medication reminders
-	cur, err = a.C("meds").Find(ctx, bson.M{"times": hm})
+	cur, err = a.C("meds").Find(ctx, bson.M{"times": hm, "deletedAt": nil})
 	if err == nil {
 		var ms []Med
 		cur.All(ctx, &ms)
@@ -61,6 +61,8 @@ func (a *App) tick(ctx context.Context, now time.Time) {
 		}
 	}
 
+	a.visitTick(ctx, now)
+
 	if hm == FamilyDigestAt {
 		a.familyDigest(ctx, date)
 	}
@@ -68,30 +70,42 @@ func (a *App) tick(ctx context.Context, now time.Time) {
 
 // remind pushes one subscribe message if the user has a grant left, otherwise (or on failure) writes an in-app todo.
 func (a *App) remind(ctx context.Context, uid bson.ObjectID, kind string, ref bson.ObjectID, slot, date, title string, data map[string]string) {
+	a.push(ctx, uid, kind, ref, slot, date, title, data, false, nil)
+}
+
+// push 发一次订阅消息，返回 sent / no_quota / failed / dup。
+// alwaysTodo 为 true 时无论推送成败都写待办（复诊用）。
+func (a *App) push(ctx context.Context, uid bson.ObjectID, kind string, ref bson.ObjectID, slot, date, title string, data map[string]string, alwaysTodo bool, extra bson.M) string {
 	key := kind + ":" + uid.Hex() + ":" + ref.Hex() + ":" + date + ":" + slot
 	if _, err := a.C("sent_log").InsertOne(ctx, bson.M{"key": key, "at": time.Now()}); mongo.IsDuplicateKeyError(err) {
-		return
+		return "dup"
 	}
 	var u struct {
 		OpenID string `bson:"openid"`
 	}
 	if a.C("users").FindOne(ctx, bson.M{"_id": uid}).Decode(&u) != nil {
-		return
+		return "failed"
 	}
-	pushed := false
+	status := "no_quota"
 	res := a.C("subscribe").FindOneAndUpdate(ctx, bson.M{"userId": uid, "kind": kind, "remaining": bson.M{"$gt": 0}}, bson.M{"$inc": bson.M{"remaining": -1}})
 	if res.Err() == nil {
 		if err := a.wx.SendSubscribe(ctx, u.OpenID, a.tpl(kind), "pages/index/index", data); err != nil {
 			log.Printf("push %s failed: %v", key, err)
+			status = "failed"
 		} else {
-			pushed = true
+			status = "sent"
 		}
 	}
-	if pushed {
-		return
+	if status == "sent" && !alwaysTodo {
+		return status
 	}
-	a.C("todos").InsertOne(ctx, bson.M{"userId": uid, "kind": kind, "refId": ref, "slot": slot, "date": date,
-		"title": title, "done": false, "createdAt": time.Now()})
+	doc := bson.M{"userId": uid, "kind": kind, "refId": ref, "slot": slot, "date": date,
+		"title": title, "pushed": status == "sent", "done": false, "createdAt": time.Now()}
+	for k, v := range extra {
+		doc[k] = v
+	}
+	a.C("todos").InsertOne(ctx, doc)
+	return status
 }
 
 // familyDigest tells each bound member which items the patient has not recorded today. Facts only, no judgement.
@@ -108,16 +122,18 @@ func (a *App) familyDigest(ctx context.Context, date string) {
 	day, _ := time.ParseInLocation("2006-01-02", date, CST)
 	for _, l := range links {
 		missedMed := 0
-		mc, _ := a.C("meds").Find(ctx, bson.M{"userId": l.Patient})
+		items := bson.A{}
+		mc, _ := a.C("meds").Find(ctx, bson.M{"userId": l.Patient, "deletedAt": nil})
 		var ms []Med
 		mc.All(ctx, &ms)
 		for _, m := range ms {
 			for _, t := range m.Times {
-				if t > FamilyDigestAt {
+				if slotStatus(date, t, time.Now(), false) != "missed" {
 					continue
 				}
 				if n, _ := a.C("checkins").CountDocuments(ctx, bson.M{"medId": m.ID, "date": date, "slot": t}); n == 0 {
 					missedMed++
+					items = append(items, bson.M{"medId": m.ID, "date": date, "slot": t})
 				}
 			}
 		}
@@ -143,6 +159,8 @@ func (a *App) familyDigest(ctx context.Context, date string) {
 			}
 			msg += "有" + itoa(missedMed) + "次用药未打卡"
 		}
+		a.C("family_msgs").InsertOne(ctx, bson.M{"memberId": l.Member, "patientId": l.Patient, "date": date,
+			"text": msg, "items": items, "createdAt": time.Now()})
 		a.remind(ctx, l.Member, "family", l.Patient, FamilyDigestAt, date, msg,
 			map[string]string{"thing1": trunc(msg, 20), "time2": date + " " + FamilyDigestAt})
 	}
