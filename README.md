@@ -43,7 +43,7 @@ VITE_API_BASE=https://api.example.com
 cd server
 cp .env.example .env      # 填写 JWT_SECRET、DATA_KEY（openssl rand -hex 32）等
 set -a; . ./.env; set +a
-go run .
+go run ./cmd/server
 B=http://localhost:8080 bash test.sh   # 接口自测
 ```
 本地联调请用微信开发者工具或真机运行小程序（H5 无法完成微信登录）。开发者工具里可勾选「不校验合法域名」以访问 `http://127.0.0.1:8080`；真机需填电脑的局域网 IP。

@@ -13,3 +13,4 @@ mongo-data/
 *.log
 server.log
 bp-server.log
+uploads/

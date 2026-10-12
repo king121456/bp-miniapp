@@ -33,6 +33,9 @@ func (s *Server) Engine() *gin.Engine {
 	}))
 	r.POST("/api/auth/login", adapt(s.App.Login))
 	r.GET("/api/me", s.auth(s.App.Me))
+	r.PUT("/api/me", s.auth(s.App.UpdateMe))
+	r.POST("/api/me/avatar", s.auth(s.App.UploadAvatar))
+	r.Static("/uploads", service.UploadDir)
 
 	r.GET("/api/bp", s.auth(s.App.ListBP))
 	r.POST("/api/bp", s.auth(s.App.CreateBP))

@@ -64,10 +64,11 @@ func (a *App) ListFamily(w http.ResponseWriter, r *http.Request, uid bson.Object
 		out := []bson.M{}
 		for _, l := range links {
 			var u struct {
-				Nickname string `bson:"nickname"`
+				Nickname  string `bson:"nickname"`
+				AvatarURL string `bson:"avatarUrl"`
 			}
 			_ = a.C("users").FindOne(r.Context(), bson.M{"_id": l[other]}).Decode(&u)
-			out = append(out, bson.M{"id": l["_id"], "userId": l[other], other: l[other], "nickname": u.Nickname, "createdAt": l["createdAt"]})
+			out = append(out, bson.M{"id": l["_id"], "userId": l[other], other: l[other], "nickname": u.Nickname, "avatarUrl": u.AvatarURL, "createdAt": l["createdAt"]})
 		}
 		return out
 	}
