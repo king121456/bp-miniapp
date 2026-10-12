@@ -53,6 +53,7 @@
 - `DELETE /api/meds/:id/makeup?date=&time=` 撤销补记，恢复为漏服，写操作日志。
 - 普通打卡 `POST /api/meds/:id/checkin` 遇到已漏服的时段返回 409 `slot missed, use makeup`。
 - 删除药品改为软删除，删除前的历史时段仍能补记。
+- 服药计划带版本：`PUT /api/meds/:id` 改了服药时间时，会追加一版从今天起生效的计划（同一天多次修改只保留最后一版）。历史时段、补记校验和报告的应服次数都按当天生效的那一版计算，改时间不会让以前的记录变成漏服。老数据第一次修改时自动补一版从创建日起的原计划。
 - 家人：`GET /api/family/patients/:pid/meds/history` 只读，同样能看到 `isMakeup`，没有 `canMakeup/canRevoke`。补记接口家人调用返回 404。
 - 家人站内消息 `GET /api/family/messages` → `[{ id, patientId, date, text, createdAt, makeupNotes: ["08:00 的用药已于 10月11日 21:15 补记"] }]`。补记不撤回已发通知，也不另发订阅消息；判定时已补记的时段不会进通知。
 - 就诊报告 `adherence` 多了 `makeup`（其中补记次数），每种药也有 `makeup`。

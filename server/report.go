@@ -101,13 +101,25 @@ func (a *App) report(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) 
 	sort.Slice(sym, func(i, j int) bool { return sym[i]["count"].(int) > sym[j]["count"].(int) })
 
 	// 用药与完成率：计划次数按药品当前的服药时间点 × 天数估算
-	var meds []Med
-	mc, _ := a.C("meds").Find(r.Context(), bson.M{"userId": uid, "deletedAt": nil})
-	mc.All(r.Context(), &meds)
+	var full []medFull
+	mc, _ := a.C("meds").Find(r.Context(), bson.M{"userId": uid})
+	mc.All(r.Context(), &full)
 	medOut := []map[string]any{}
 	planned, taken, makeups := 0, 0, 0
-	for _, m := range meds {
-		p := len(m.Times) * ndays
+	for _, m := range full {
+		// 按每天生效的计划版本累加应服次数，删除后的日子不算
+		p := 0
+		for i := 0; i < ndays; i++ {
+			d := start.AddDate(0, 0, i).Format("2006-01-02")
+			for _, t := range m.timesOn(d) {
+				if slotExists(m, d, t) {
+					p++
+				}
+			}
+		}
+		if p == 0 && m.DeletedAt != nil {
+			continue
+		}
 		n, _ := a.C("checkins").CountDocuments(r.Context(), bson.M{"userId": uid, "medId": m.ID,
 			"date": bson.M{"$gte": start.Format("2006-01-02"), "$lte": end.Format("2006-01-02")}})
 		mk, _ := a.C("checkins").CountDocuments(r.Context(), bson.M{"userId": uid, "medId": m.ID, "isMakeup": true,

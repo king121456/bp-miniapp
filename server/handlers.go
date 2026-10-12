@@ -346,7 +346,9 @@ type Med struct {
 	User  bson.ObjectID `json:"-" bson:"userId"`
 	Name  string        `json:"name" bson:"name"`
 	Dose  string        `json:"dose" bson:"dose"`
-	Times []string      `json:"times" bson:"times"`
+	Times []string      `json:"times" bson:"times"` // 当前生效的服药时间
+	// Schedules 服药计划版本：每次改时间追加一版，From 起生效（含当天）
+	Schedules []Schedule `json:"-" bson:"schedules,omitempty"`
 }
 
 func (a *App) medIn(r *http.Request) (Med, bool) {
@@ -410,6 +412,7 @@ func (a *App) createMed(w http.ResponseWriter, r *http.Request, uid bson.ObjectI
 	}
 	name, dose := m.Name, m.Dose
 	m.User, m.Name, m.Dose = uid, a.enc(name), a.enc(dose)
+	m.Schedules = []Schedule{{From: today(), Times: m.Times}}
 	res, err := a.C("meds").InsertOne(r.Context(), m)
 	if err != nil {
 		fail(w, 500, "db error")
@@ -426,8 +429,24 @@ func (a *App) updateMed(w http.ResponseWriter, r *http.Request, uid bson.ObjectI
 		fail(w, 400, "invalid input")
 		return
 	}
+	var cur Med
+	if a.C("meds").FindOne(r.Context(), bson.M{"_id": id, "userId": uid, "deletedAt": nil}).Decode(&cur) != nil {
+		fail(w, 404, "not found")
+		return
+	}
+	scheds := cur.Schedules
+	if len(scheds) == 0 { // 老数据：补一版从创建日起的原计划
+		scheds = []Schedule{{From: cur.ID.Timestamp().In(CST).Format("2006-01-02"), Times: cur.Times}}
+	}
+	if !sameTimes(scheds[len(scheds)-1].Times, m.Times) {
+		if scheds[len(scheds)-1].From == today() {
+			scheds[len(scheds)-1].Times = m.Times
+		} else {
+			scheds = append(scheds, Schedule{From: today(), Times: m.Times})
+		}
+	}
 	res, err := a.C("meds").UpdateOne(r.Context(), bson.M{"_id": id, "userId": uid, "deletedAt": nil},
-		bson.M{"$set": bson.M{"name": a.enc(m.Name), "dose": a.enc(m.Dose), "times": m.Times}})
+		bson.M{"$set": bson.M{"name": a.enc(m.Name), "dose": a.enc(m.Dose), "times": m.Times, "schedules": scheds}})
 	if err != nil || res.MatchedCount == 0 {
 		fail(w, 404, "not found")
 		return
@@ -754,4 +773,38 @@ func fixBP(b *BP, a *App) {
 	if b.Tags == nil {
 		b.Tags = []string{}
 	}
+}
+
+type Schedule struct {
+	From  string   `json:"from" bson:"from"`
+	Times []string `json:"times" bson:"times"`
+}
+
+func sameTimes(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+// timesOn 返回某天生效的服药时间（按生效日期取最近一版）
+func (m Med) timesOn(date string) []string {
+	if len(m.Schedules) == 0 {
+		return m.Times
+	}
+	var t []string
+	for _, s := range m.Schedules {
+		if s.From <= date {
+			t = s.Times
+		}
+	}
+	if t == nil && date >= m.ID.Timestamp().In(CST).Format("2006-01-02") {
+		t = m.Schedules[0].Times
+	}
+	return t
 }

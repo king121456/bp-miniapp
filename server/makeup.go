@@ -59,7 +59,7 @@ func slotExists(m medFull, date, slot string) bool {
 	if m.DeletedAt != nil && !s.Before(*m.DeletedAt) {
 		return false
 	}
-	for _, t := range m.Times {
+	for _, t := range m.timesOn(date) {
 		if t == slot {
 			return true
 		}
@@ -85,7 +85,7 @@ func (a *App) history(ctx context.Context, uid bson.ObjectID, days int, includeN
 	for d := 0; d < days; d++ {
 		date := now.AddDate(0, 0, -d).Format("2006-01-02")
 		for _, m := range meds {
-			for _, t := range m.Times {
+			for _, t := range m.timesOn(date) {
 				if !slotExists(m, date, t) {
 					continue
 				}

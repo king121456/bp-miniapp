@@ -189,3 +189,43 @@ func TestVisits(t *testing.T) {
 		t.Fatalf("expire: status=%s todos=%d", got.Status, n)
 	}
 }
+
+func TestScheduleVersions(t *testing.T) {
+	c, ctx := newTC(t)
+	pid, pt := c.user(ctx, "p")
+	now := time.Now().In(CST)
+	d := func(n int) string { return now.AddDate(0, 0, -n).Format("2006-01-02") }
+	medID := bson.NewObjectIDFromTimestamp(time.Now().AddDate(0, 0, -10))
+	c.app.C("meds").InsertOne(ctx, bson.M{"_id": medID, "userId": pid, "name": c.app.enc("药B"), "dose": "", "times": []string{"09:00"},
+		"schedules": bson.A{bson.M{"from": d(10), "times": []string{"08:00"}}, bson.M{"from": d(3), "times": []string{"09:00"}}}})
+	mk := "/api/meds/" + medID.Hex() + "/makeup"
+	if s, _ := c.do("POST", mk, pt, slotIn{d(5), "09:00"}); s != 400 {
+		t.Fatalf("09:00 did not exist 5 days ago: %d", s)
+	}
+	if s, _ := c.do("POST", mk, pt, slotIn{d(5), "08:00"}); s != 200 {
+		t.Fatalf("08:00 existed 5 days ago: %d", s)
+	}
+	if s, _ := c.do("POST", mk, pt, slotIn{d(2), "08:00"}); s != 400 {
+		t.Fatalf("08:00 no longer exists 2 days ago: %d", s)
+	}
+	_, h := c.do("GET", "/api/meds/history?days=7", pt, nil)
+	for _, x := range h["data"].([]any) {
+		it := x.(map[string]any)
+		if (it["date"].(string) >= d(3) && it["time"] != "09:00") || (it["date"].(string) < d(3) && it["time"] != "08:00") {
+			t.Fatalf("wrong slot in history: %v %v", it["date"], it["time"])
+		}
+	}
+	_, rp := c.do("GET", "/api/report?days=7", pt, nil)
+	if p := rp["data"].(map[string]any)["adherence"].(map[string]any)["planned"].(float64); p != 7 {
+		t.Fatalf("planned=%v want 7", p)
+	}
+	// 通过接口改时间：追加一版今天生效的计划，历史不变
+	if s, _ := c.do("PUT", "/api/meds/"+medID.Hex(), pt, map[string]any{"name": "药B", "times": []string{"07:00", "19:00"}}); s != 200 {
+		t.Fatalf("update: %d", s)
+	}
+	var m Med
+	c.app.C("meds").FindOne(ctx, bson.M{"_id": medID}).Decode(&m)
+	if len(m.Schedules) != 3 || m.Schedules[2].From != d(0) || len(m.timesOn(d(1))) != 1 || m.timesOn(d(1))[0] != "09:00" {
+		t.Fatalf("schedules: %+v", m.Schedules)
+	}
+}
