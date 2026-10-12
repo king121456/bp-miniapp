@@ -24,6 +24,7 @@ func TestReminderAndDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	app.wx = fakeWx{}
 	app.EnsureIndexes(ctx)
 	uid := bson.NewObjectID()
 	db.Collection("users").InsertOne(ctx, bson.M{"_id": uid, "openid": "t"})
@@ -60,4 +61,13 @@ func testDB(t *testing.T, name string) *mongo.Database {
 		t.Skip("MongoDB not reachable, skipping")
 	}
 	return cli.Database(name)
+}
+
+type fakeWx struct{}
+
+func (fakeWx) Code2Session(_ context.Context, code string) (string, error) {
+	return "test_" + code, nil
+}
+func (fakeWx) SendSubscribe(context.Context, string, string, string, map[string]string) error {
+	return nil
 }

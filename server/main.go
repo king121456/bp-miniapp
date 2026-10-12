@@ -47,13 +47,8 @@ func main() {
 	if len(cfg.JWTSecret) < 16 || len(cfg.DataKey) != 64 {
 		log.Fatal("JWT_SECRET (>=16 chars) and DATA_KEY (64 hex chars = AES-256 key) are required")
 	}
-	if os.Getenv("APP_ENV") != "dev" && (cfg.WxAppID == "" || cfg.WxSecret == "") {
-		log.Fatal("WX_APPID and WX_SECRET are required unless APP_ENV=dev")
-	}
-	if cfg.WxAppID == "" {
-		log.Print("WARNING: WX_APPID empty, fake login enabled (any code is accepted, openid=dev_<code>)")
-	} else if os.Getenv("APP_ENV") == "dev" {
-		log.Print("APP_ENV=dev: real WeChat login, dev CORS allowed")
+	if cfg.WxAppID == "" || cfg.WxSecret == "" {
+		log.Fatal("WX_APPID and WX_SECRET are required")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

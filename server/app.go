@@ -26,7 +26,7 @@ type App struct {
 	cfg  Config
 	db   *mongo.Database
 	aead cipher.AEAD
-	wx   *Wx
+	wx   WxAPI
 }
 
 func NewApp(cfg Config, db *mongo.Database) (*App, error) {

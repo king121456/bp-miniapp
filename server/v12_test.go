@@ -38,6 +38,7 @@ func newTC(t *testing.T) (tc, context.Context) {
 	db.Drop(ctx)
 	app, _ := NewApp(Config{JWTSecret: "0123456789abcdef", DataKey: "00000000000000000000000000000000000000000000000000000000000000aa",
 		MakeupDays: 7, VisitMaxDays: 365, VisitRemindTime: "19:00"}, db)
+	app.wx = fakeWx{}
 	app.EnsureIndexes(ctx)
 	t.Cleanup(func() { db.Drop(ctx) })
 	return tc{t, app, app.Routes()}, ctx
