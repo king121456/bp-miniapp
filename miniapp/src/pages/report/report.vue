@@ -10,7 +10,7 @@
         <text class="f12 c9">至</text>
         <picker mode="date" :value="to" :end="today" @change="e => setRange(from, e.detail.value)"><view class="pk f14 c0 num">{{ to }}</view></picker>
       </view>
-      <view class="cell nm"><text class="f14 c3">报告上的姓名</text><input class="ip f14 c0" v-model="name" placeholder="选填，仅保存在本机" placeholder-class="phc" maxlength="12" @blur="saveName" @confirm="saveName" /></view>
+      <view class="cell nm"><text class="f14 c3">报告上的姓名</text><input class="ip f14 c0" v-model="name" placeholder="默认使用昵称，可修改" placeholder-class="phc" maxlength="12" @blur="saveName" @confirm="saveName" /></view>
       <view class="f10 c9">姓名只保存在本机，不会上传。</view>
     </view>
     <view class="wrap"><canvas canvas-id="rc" id="rc" class="cv" :style="{ width: W + 'px', height: H + 'px' }"></canvas></view>
@@ -23,7 +23,7 @@
   </view>
 </template>
 <script>
-import { guard, getReport, getReportName, setReportName, getRole } from '../../api.js'
+import { guard, getReport, getReportName, setReportName, getRole, getProfile } from '../../api.js'
 const p2 = n => String(n).padStart(2, '0')
 const ymd = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate())
 const BW = 360, BH = 640 // 设计坐标（9:16）
@@ -35,7 +35,7 @@ export default {
     return { opts: [{ k: 7, t: '近7天' }, { k: 30, t: '近30天' }, { k: 90, t: '近90天' }, { k: 'custom', t: '自定义' }], mode: 30, from: ymd(f), to: ymd(t), today: ymd(t), name: '', rep: null, err: '', fromVisit: false, W, H: Math.round(W * 16 / 9) }
   },
   onLoad(o) {
-    if (!guard()) return; this.name = getReportName()
+    if (!guard()) return; this.name = getReportName() || getProfile().nickname || ''
     if (getRole() === 'family') { uni.showToast({ title: '家人端不提供导出', icon: 'none' }); return setTimeout(() => uni.navigateBack(), 800) }
     // 从复诊提醒进入：结束日期为今天，默认往前 30 天（自定义范围，可改选）
     if (o && o.from === 'visit') { this.fromVisit = true; this.mode = 'custom' }
@@ -74,29 +74,32 @@ export default {
         ctx.setStrokeStyle(C.pm); ctx.setLineDash([4, 3], 0); ctx.beginPath(); ctx.moveTo(BW - 100, y - 4); ctx.lineTo(BW - 80, y - 4); ctx.stroke(); ctx.setLineDash([], 0); txt('晚', BW - 76, y, 10, C.sub)
       }
       const S = r.series || []
+      // 有数据的天数少（≤7）时只画这些天，均匀铺开（1 天居中），避免挤在右边
+      const has = S.filter(d => d.morning || d.evening), few = has.length > 0 && has.length <= 7
+      const P = few ? has : S
       const chart = (y0, h, keys, title, unit) => {
         txt(title, 20, y0 + 12, 14, C.ink, 'left', true); txt(unit, 20 + (title.length * 14) + 4, y0 + 12, 10, C.sub); legend(y0 + 12)
         const top = y0 + 22, bot = y0 + h, L = 44, R = BW - 20
-        const vals = []; S.forEach(d => ['morning', 'evening'].forEach(p => d[p] && keys.forEach(kk => d[p][kk] != null && vals.push(d[p][kk]))))
+        const vals = []; P.forEach(d => ['morning', 'evening'].forEach(p => d[p] && keys.forEach(kk => d[p][kk] != null && vals.push(d[p][kk]))))
         let lo = vals.length ? Math.min(...vals) : 60, hi = vals.length ? Math.max(...vals) : 140
         lo = Math.floor((lo - 5) / 10) * 10; hi = Math.ceil((hi + 5) / 10) * 10; if (hi - lo < 20) hi = lo + 20
-        const Y = v => bot - (v - lo) / (hi - lo) * (bot - top), X = i => S.length > 1 ? L + i * (R - L) / (S.length - 1) : (L + R) / 2
+        const Y = v => bot - (v - lo) / (hi - lo) * (bot - top), X = i => few ? L + (i + 0.5) * (R - L) / P.length : P.length > 1 ? L + i * (R - L) / (P.length - 1) : (L + R) / 2
         ctx.setLineWidth(0.5); ctx.setStrokeStyle(C.line); ctx.setLineDash([], 0)
         for (let i = 0; i <= 2; i++) { const v = lo + (hi - lo) * i / 2, y = Y(v); ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(R, y); ctx.stroke(); txt(Math.round(v), L - 6, y + 3, 10, C.sub, 'right') }
-        if (S.length) { txt(S[0].date.slice(5), L, bot + 12, 10, C.sub, 'left'); txt(S[S.length - 1].date.slice(5), R, bot + 12, 10, C.sub, 'right') }
+        if (few) P.forEach((d, i) => txt(d.date.slice(5), X(i), bot + 12, 10, C.sub, 'center')); else if (S.length) { txt(S[0].date.slice(5), L, bot + 12, 10, C.sub, 'left'); txt(S[S.length - 1].date.slice(5), R, bot + 12, 10, C.sub, 'right') }
         for (const [p, col, dash] of [['morning', C.am, []], ['evening', C.pm, [4, 3]]]) for (const kk of keys) {
           ctx.setStrokeStyle(col); ctx.setFillStyle(col); ctx.setLineWidth(1.5); ctx.setLineDash(dash, 0)
           let open = false; ctx.beginPath()
-          S.forEach((d, i) => { const v = d[p] && d[p][kk]; if (v == null) return; open ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)); open = true }) // 跨过没测量的日子连线
+          P.forEach((d, i) => { const v = d[p] && d[p][kk]; if (v == null) return; open ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)); open = true }) // 跨过没测量的日子连线
           ctx.stroke(); ctx.setLineDash([], 0)
-          S.forEach((d, i) => { const v = d[p] && d[p][kk]; if (v != null) { ctx.beginPath(); ctx.arc(X(i), Y(v), S.length > 40 ? 1.5 : 2.5, 0, 2 * Math.PI); ctx.fill() } })
+          P.forEach((d, i) => { const v = d[p] && d[p][kk]; if (v != null) { ctx.beginPath(); ctx.arc(X(i), Y(v), few ? 4 : P.length > 40 ? 1.5 : 2.5, 0, 2 * Math.PI); ctx.fill(); if (few) txt(Math.round(v), X(i), Y(v) - 7, 10, col, 'center') } })
         }
       }
       chart(108, 150, ['sys', 'dia'], '血压', 'mmHg'); txt('上方为收缩压，下方为舒张压', BW / 2, 270, 10, C.sub, 'center')
       chart(286, 80, ['hr'], '心率', '次/分')
       // 均值
       let y = 400; ctx.setFillStyle('#F5F7F6'); ctx.fillRect(16, y - 14, BW - 32, 64)
-      const av = (a) => a ? `${a.sys}/${a.dia}` + (a.hr != null ? ` · ${a.hr}` : '') : '—'
+      const av = (a) => a ? `${a.sys}/${a.dia}` + (a.hr != null ? ` · ${a.hr}` : '') : '暂无记录'
       txt('全部平均', 28, y + 4, 10, C.sub); txt(av(r.average), 28, y + 24, 14, C.ink, 'left', true)
       txt('早间（0–12点）', 140, y + 4, 10, C.sub); txt(av(r.morning), 140, y + 24, 12, C.ink)
       txt('晚间', 250, y + 4, 10, C.sub); txt(av(r.evening), 250, y + 24, 12, C.ink)

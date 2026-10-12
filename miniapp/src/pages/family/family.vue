@@ -12,7 +12,7 @@
     <view class="card lst">
       <view v-if="!list.length" class="empty">还没有家人绑定</view>
       <view class="cell" v-for="f in list" :key="f.id">
-        <view class="av">{{ f.name.slice(-1) }}</view>
+        <image v-if="f.avatar" class="av" :src="f.avatar" mode="aspectFill" /><view v-else class="av">{{ f.name.slice(-1) }}</view>
         <view class="flex1 mn"><view class="f14 c0 b">{{ f.name }}<text class="f12 c9 rel">{{ f.relation }}</text></view><view class="f10 c9">{{ since(f.boundAt) }} 绑定 · 只读查看</view></view>
         <view class="ub f12 c6" @tap="unbind(f)">解除绑定</view>
       </view>

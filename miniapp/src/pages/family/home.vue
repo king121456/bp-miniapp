@@ -5,7 +5,7 @@
     <view class="hd"><view class="f12 c6">家人视角 · 只读查看</view><view class="f20 c0 b">我关注的家人</view></view>
     <view v-if="!list.length" class="card empty">还没有关注家人，输入家人给你的邀请码即可查看</view>
     <view class="card pc" v-for="p in list" :key="p.id" @tap="open(p)">
-      <view class="top"><view class="av">{{ p.name.slice(-1) }}</view>
+      <view class="top"><image v-if="p.avatar" class="av" :src="p.avatar" mode="aspectFill" /><view v-else class="av">{{ p.name.slice(-1) }}</view>
         <view class="flex1 mn"><view class="f16 c0 b">{{ p.name }}</view><view class="f12 c9">{{ p.latest ? '最近一次 ' + ft(p.latest.time) : '还没有血压记录' }}</view></view>
         <image class="arrow" src="/static/icons/right-9.svg" /></view>
       <view class="kv">

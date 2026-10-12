@@ -56,8 +56,21 @@ export async function login(nickname = '王阿姨') {
   if (!get(K.profile, null)) set(K.profile, { nickname, since: Date.now() })
 }
 export const getProfile = () => get(K.profile, { nickname: '用户', since: Date.now() })
-// 头像/昵称：后端暂无资料更新接口，先存本机（头像用 saveFile 持久化临时文件）
 export const setProfile = p => set(K.profile, { ...getProfile(), ...p })
+// 后端返回的 /uploads/... 相对地址补上 API 域名
+export const avatarSrc = u => !u ? '' : /^\//.test(u) ? BASE + u : u
+const keepMe = u => { if (u) setProfile({ nickname: u.nickname || getProfile().nickname, avatar: avatarSrc(u.avatarUrl) }); return getProfile() }
+// GET /api/me → { nickname, avatarUrl, ... }
+export async function syncProfile() { return keepMe(await req('/api/me').catch(() => null)) }
+// PUT /api/me { nickname?, avatarUrl? }（昵称 1-20 字）
+export async function updateMe(b) { return keepMe(await req('/api/me', 'PUT', b)) }
+// POST /api/me/avatar multipart file → { avatarUrl }，再写回资料
+export function uploadAvatar(path) {
+  return new Promise((ok, no) => uni.uploadFile({ url: BASE + '/api/me/avatar', filePath: path, name: 'file',
+    header: { Authorization: 'Bearer ' + (uni.getStorageSync('token') || '') },
+    success: r => { let b = {}; try { b = JSON.parse(r.data) } catch (e) {} if (b.code === 0 && b.data && b.data.avatarUrl) ok(b.data.avatarUrl); else { uni.showToast({ title: b.message || '头像上传失败', icon: 'none' }); no(b) } },
+    fail: e => { uni.showToast({ title: '网络异常，请稍后再试', icon: 'none' }); no(e) } }))
+}
 
 // ---------- 血压 ----------
 export async function listRecords() { return (await req('/api/bp')).map(toRec) }
@@ -141,9 +154,9 @@ export async function saveRemind(r) {
 export async function createInvite() { const d = await req('/api/family/invite', 'POST'); const inv = { code: d.code, expireAt: ms(d.expiresAt) }; set(K.invite, inv); return inv }
 export const getInvite = () => { const v = get(K.invite, null); return v && v.expireAt > Date.now() ? v : null }
 // members：能看我的人（id 为绑定关系 id，仅用于解绑）
-export async function listFamily() { return ((await req('/api/family')).members || []).map(f => ({ id: f.id, memberId: f.memberId, name: f.nickname || '家人', relation: '', boundAt: ms(f.createdAt) })) }
+export async function listFamily() { return ((await req('/api/family')).members || []).map(f => ({ id: f.id, memberId: f.memberId, name: f.nickname || '家人', avatar: avatarSrc(f.avatarUrl), relation: '', boundAt: ms(f.createdAt) })) }
 // patients：我能看的人；查看用 patientId
-export async function listPatients() { return ((await req('/api/family')).patients || []).map(p => ({ id: p.id, patientId: p.patientId, name: p.nickname || '家人', boundAt: ms(p.createdAt) })) }
+export async function listPatients() { return ((await req('/api/family')).patients || []).map(p => ({ id: p.id, patientId: p.patientId, name: p.nickname || '家人', avatar: avatarSrc(p.avatarUrl), boundAt: ms(p.createdAt) })) }
 const noNote = r => ({ ...r, note: '' }) // 家人端不展示备注文字
 export async function listPatientRecords(pid) { return (await req('/api/family/patients/' + pid + '/bp')).map(toRec).map(noNote) }
 export async function patientStats(pid, range = 'week') { return req('/api/family/patients/' + pid + '/bp/stats?range=' + range) }

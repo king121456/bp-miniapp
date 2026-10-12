@@ -36,12 +36,12 @@
     <view class="danger f14" @tap="logout"><image src="/static/icons/trash-6.svg" />删除全部数据并注销</view>
     <view class="f10 c9 ft">本工具仅用于记录，不提供诊断建议</view>
 
-    <view class="mask" v-if="nmOpen" @tap="nmOpen = false"><view class="modal" @tap.stop><view class="f16 c0 b mt">修改昵称</view><view class="nmb"><input class="nmi f16 c0" type="nickname" v-model="nmIn" maxlength="16" placeholder="输入或使用微信昵称" placeholder-class="phc" @blur="e => nmIn = e.detail.value" /></view><view class="mbr"><view class="mb f16 c9 flex1" @tap="nmOpen = false">取消</view><view class="mb f16 cg b flex1" @tap="saveName">保存</view></view></view></view>
+    <view class="mask" v-if="nmOpen" @tap="nmOpen = false"><view class="modal" @tap.stop><view class="f16 c0 b mt">修改昵称</view><view class="nmb"><input class="nmi f16 c0" type="nickname" v-model="nmIn" maxlength="20" placeholder="输入或使用微信昵称" placeholder-class="phc" @blur="e => nmIn = e.detail.value" /></view><view class="mbr"><view class="mb f16 c9 flex1" @tap="nmOpen = false">取消</view><view class="mb f16 cg b flex1" @tap="saveName">保存</view></view></view></view>
     <view class="mask" v-if="json" @tap="json = ''"><view class="modal" @tap.stop><view class="f16 c0 b mt">导出数据</view><scroll-view scroll-y class="jb"><text class="f10 c6" user-select>{{ json }}</text></scroll-view><view class="mb f16 cg b" @tap="json = ''">完成</view></view></view>
   </view>
 </template>
 <script>
-import { setProfile, getVisit, listPatients, setRole, guard, getProfile, listRecords, listMedDefs, listFamily, getRemind, exportData, deleteAccount, getConsent, dayKey } from '../../api.js'
+import { syncProfile, updateMe, uploadAvatar, getVisit, listPatients, setRole, guard, getProfile, listRecords, listMedDefs, listFamily, getRemind, exportData, deleteAccount, getConsent, dayKey } from '../../api.js'
 export default {
   data: () => ({ visit: '', pats: 0, name: '', total: 0, days: 0, meds: 0, fam: 0, rem: '', json: '', ver: '', avatar: '', nmOpen: false, nmIn: '' }),
   computed: { g1() { return [
@@ -50,7 +50,7 @@ export default {
     { t: '家人共享', i: 'family-o', bg: 'bg-o', u: '/pages/family/family', s: this.fam ? this.fam + ' 位家人' : '未绑定' }] } },
   async onShow() {
     if (!guard()) return
-    const pf = getProfile(); this.name = pf.nickname; this.avatar = pf.avatar || ''; this.ver = (getConsent() || {}).version
+    let pf = getProfile(); this.name = pf.nickname; this.avatar = pf.avatar || ''; pf = await syncProfile(); this.name = pf.nickname; this.avatar = pf.avatar || ''; this.ver = (getConsent() || {}).version
     const r = await listRecords(); this.total = r.length; this.days = new Set(r.map(x => dayKey(x.time))).size
     this.meds = (await listMedDefs()).length; this.fam = (await listFamily()).length
     const v = await getVisit(); this.visit = v ? v.date.slice(5).replace('-', '/') + ' 复诊' : '未设置'
@@ -61,13 +61,13 @@ export default {
     go(url) { uni.navigateTo({ url }) },
     onAvatar(e) {
       const p = e.detail && e.detail.avatarUrl; if (!p) return
-      const done = fp => { this.avatar = fp; setProfile({ avatar: fp }) }
-      uni.saveFile({ tempFilePath: p, success: r => done(r.savedFilePath), fail: () => done(p) })
+      uni.showLoading({ title: '上传中' })
+      uploadAvatar(p).then(u => updateMe({ avatarUrl: u })).then(pf => { this.avatar = pf.avatar; uni.showToast({ title: '头像已更新', icon: 'none' }) }).catch(() => {}).finally(() => uni.hideLoading())
     },
     editName() { this.nmIn = this.name; this.nmOpen = true },
-    saveName() {
-      const n = (this.nmIn || '').trim(); if (!n) return uni.showToast({ title: '昵称不能为空', icon: 'none' })
-      this.name = n; setProfile({ nickname: n }); this.nmOpen = false; uni.showToast({ title: '已保存', icon: 'none' })
+    async saveName() {
+      const n = (this.nmIn || '').trim(); if (!n || n.length > 20) return uni.showToast({ title: '昵称需 1-20 个字', icon: 'none' })
+      const pf = await updateMe({ nickname: n }); this.name = pf.nickname; this.nmOpen = false; uni.showToast({ title: '已保存', icon: 'none' })
     },
     toFamily() { setRole('family'); uni.reLaunch({ url: '/pages/family/home' }) },
     async exp() {
