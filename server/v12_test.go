@@ -229,3 +229,79 @@ func TestScheduleVersions(t *testing.T) {
 		t.Fatalf("schedules: %+v", m.Schedules)
 	}
 }
+
+func TestSkip(t *testing.T) {
+	c, ctx := newTC(t)
+	pid, pt := c.user(ctx, "p")
+	fid, ft := c.user(ctx, "f")
+	c.app.C("family").InsertOne(ctx, bson.M{"patientId": pid, "memberId": fid})
+	now := time.Now().In(CST)
+	d := func(n int) string { return now.AddDate(0, 0, -n).Format("2006-01-02") }
+	medID := bson.NewObjectIDFromTimestamp(time.Now().AddDate(0, 0, -10))
+	c.app.C("meds").InsertOne(ctx, bson.M{"_id": medID, "userId": pid, "name": c.app.enc("药C"), "dose": "", "times": []string{"08:00"}})
+	base := "/api/meds/" + medID.Hex()
+	if s, _ := c.do("POST", base+"/skip", pt, slotIn{d(-1), "08:00"}); s != 400 {
+		t.Fatalf("future skip: %d", s)
+	}
+	if s, _ := c.do("POST", base+"/skip", ft, slotIn{d(1), "08:00"}); s != 404 {
+		t.Fatalf("family skip must be rejected: %d", s)
+	}
+	if s, _ := c.do("POST", base+"/skip", pt, slotIn{d(1), "08:00"}); s != 200 {
+		t.Fatalf("skip: %d", s)
+	}
+	if s, _ := c.do("POST", base+"/skip", pt, slotIn{d(1), "08:00"}); s != 409 {
+		t.Fatalf("double skip: %d", s)
+	}
+	st := func(date string) map[string]any {
+		_, h := c.do("GET", "/api/meds/history?days=3", pt, nil)
+		for _, x := range h["data"].([]any) {
+			if it := x.(map[string]any); it["date"] == date {
+				return it
+			}
+		}
+		return nil
+	}
+	if it := st(d(1)); it["status"] != "skipped" || it["canMakeup"] != true {
+		t.Fatalf("history after skip: %v", it)
+	}
+	// 未服可以补记，撤销补记后回到未服
+	if s, _ := c.do("POST", base+"/makeup", pt, slotIn{d(1), "08:00"}); s != 200 {
+		t.Fatalf("makeup skipped: %d", s)
+	}
+	if it := st(d(1)); it["status"] != "taken" || it["isMakeup"] != true {
+		t.Fatalf("after makeup: %v", it)
+	}
+	_, r := c.do("DELETE", base+"/makeup?date="+d(1)+"&time=08:00", pt, nil)
+	if r["data"].(map[string]any)["status"] != "skipped" || st(d(1))["status"] != "skipped" {
+		t.Fatalf("revoke should restore skipped: %v", r)
+	}
+	// 未服不进家人漏服通知
+	c.app.C("skips").InsertOne(ctx, bson.M{"userId": pid, "medId": medID, "date": d(0), "slot": "08:00"})
+	c.app.C("checkins").DeleteMany(ctx, bson.M{"date": d(0)})
+	c.app.familyDigest(ctx, d(0))
+	var fm struct {
+		Items []any `bson:"items"`
+	}
+	c.app.C("family_msgs").FindOne(ctx, bson.M{"memberId": fid}).Decode(&fm)
+	if len(fm.Items) != 0 {
+		t.Fatalf("skipped slot must not alert family: %v", fm.Items)
+	}
+	// 撤销未服
+	if s, _ := c.do("DELETE", base+"/skip?date="+d(1)+"&time=08:00", pt, nil); s != 200 || st(d(1))["status"] != "missed" {
+		t.Fatalf("unskip: %d", s)
+	}
+}
+
+func TestOneUpcomingVisitIndex(t *testing.T) {
+	c, ctx := newTC(t)
+	pid := bson.NewObjectID()
+	if _, err := c.app.C("visits").InsertOne(ctx, bson.M{"patientId": pid, "status": "upcoming"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := c.app.C("visits").InsertOne(ctx, bson.M{"patientId": pid, "status": "upcoming"}); err == nil {
+		t.Fatal("unique index on upcoming visit missing")
+	}
+	if _, err := c.app.C("visits").InsertOne(ctx, bson.M{"patientId": pid, "status": "cancelled"}); err != nil {
+		t.Fatal("cancelled visits must be allowed", err)
+	}
+}

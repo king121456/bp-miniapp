@@ -127,8 +127,12 @@ func (a *App) familyDigest(ctx context.Context, date string) {
 		var ms []Med
 		mc.All(ctx, &ms)
 		for _, m := range ms {
-			for _, t := range m.Times {
+			for _, t := range m.timesOn(date) {
 				if slotStatus(date, t, time.Now(), false) != "missed" {
+					continue
+				}
+				// 用户主动标了"没吃"的不算漏服，不通知家人
+				if a.isSkipped(ctx, l.Patient, m.ID, date, t) {
 					continue
 				}
 				if n, _ := a.C("checkins").CountDocuments(ctx, bson.M{"medId": m.ID, "date": date, "slot": t}); n == 0 {

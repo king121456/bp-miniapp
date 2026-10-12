@@ -56,6 +56,8 @@ func (a *App) Routes() http.Handler {
 	m.HandleFunc("GET /api/meds/makeup", a.auth(a.makeupCandidates))
 	m.HandleFunc("POST /api/meds/{id}/makeup", a.auth(a.makeup))
 	m.HandleFunc("DELETE /api/meds/{id}/makeup", a.auth(a.revokeMakeup))
+	m.HandleFunc("POST /api/meds/{id}/skip", a.auth(a.skip))
+	m.HandleFunc("DELETE /api/meds/{id}/skip", a.auth(a.unskip))
 	m.HandleFunc("GET /api/visits", a.auth(a.listVisits))
 	m.HandleFunc("POST /api/visits", a.auth(a.createVisit))
 	m.HandleFunc("PUT /api/visits/{id}", a.auth(a.updateVisit))
@@ -752,7 +754,7 @@ func (a *App) export(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) 
 // hard delete everything belonging to the user
 func (a *App) deleteAccount(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) {
 	ctx := r.Context()
-	for _, c := range []string{"bp_records", "meds", "checkins", "subscribe", "todos", "op_log"} {
+	for _, c := range []string{"bp_records", "meds", "checkins", "skips", "subscribe", "todos", "op_log"} {
 		if _, err := a.C(c).DeleteMany(ctx, bson.M{"userId": uid}); err != nil {
 			fail(w, 500, "db error")
 			return

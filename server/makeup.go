@@ -81,6 +81,7 @@ func (a *App) history(ctx context.Context, uid bson.ObjectID, days int, includeN
 	for _, c := range cks {
 		ck[c.Med.Hex()+c.Date+c.Slot] = c
 	}
+	sk := a.skipSet(ctx, uid, from)
 	out := []map[string]any{}
 	for d := 0; d < days; d++ {
 		date := now.AddDate(0, 0, -d).Format("2006-01-02")
@@ -91,6 +92,10 @@ func (a *App) history(ctx context.Context, uid bson.ObjectID, days int, includeN
 				}
 				c, has := ck[m.ID.Hex()+date+t]
 				st := slotStatus(date, t, now, has)
+				_, skipped := sk[m.ID.Hex()+date+t]
+				if skipped && !has {
+					st = "skipped"
+				}
 				it := map[string]any{"medId": m.ID, "name": a.dec(m.Name), "dose": a.dec(m.Dose), "date": date, "time": t,
 					"scheduledAt": scheduledAt(date, t), "status": st, "isMakeup": has && c.IsMakeup, "deleted": m.DeletedAt != nil}
 				if has {
@@ -99,7 +104,9 @@ func (a *App) history(ctx context.Context, uid bson.ObjectID, days int, includeN
 						it["recordedAt"] = c.RecordedAt.In(CST)
 					}
 				}
-				it["canMakeup"] = st == "missed" && d < a.cfg.MakeupDays
+				it["canMakeup"] = (st == "missed" || st == "skipped") && d < a.cfg.MakeupDays
+				it["canSkip"] = (st == "pending" || st == "missed") && d < a.cfg.MakeupDays
+				it["canUnskip"] = st == "skipped" && d < a.cfg.MakeupDays
 				it["canRevoke"] = has && c.IsMakeup && d < a.cfg.MakeupDays
 				out = append(out, it)
 			}
@@ -134,6 +141,8 @@ func (a *App) familyMedHistory(w http.ResponseWriter, r *http.Request, uid bson.
 	for _, it := range h {
 		delete(it, "canMakeup")
 		delete(it, "canRevoke")
+		delete(it, "canSkip")
+		delete(it, "canUnskip")
 	}
 	ok(w, h)
 }
@@ -184,12 +193,15 @@ func (a *App) makeup(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) 
 		return
 	}
 	now := time.Now()
-	if st := slotStatus(in.Date, in.Time, now.In(CST), false); st != "missed" {
-		fail(w, 400, "slot is "+st+", not missed")
+	from := "missed"
+	if a.isSkipped(r.Context(), uid, m.ID, in.Date, in.Time) {
+		from = "skipped"
+	} else if st := slotStatus(in.Date, in.Time, now.In(CST), false); st != "missed" {
+		fail(w, 400, "slot is "+st+", not missed or skipped")
 		return
 	}
 	_, err := a.C("checkins").InsertOne(r.Context(), bson.M{"userId": uid, "medId": m.ID, "date": in.Date, "slot": in.Time,
-		"at": now, "isMakeup": true, "recordedAt": now, "makeupFrom": "missed", "scheduledAt": scheduledAt(in.Date, in.Time)})
+		"at": now, "isMakeup": true, "recordedAt": now, "makeupFrom": from, "scheduledAt": scheduledAt(in.Date, in.Time)})
 	if mongo.IsDuplicateKeyError(err) {
 		fail(w, 409, "already taken")
 		return
@@ -211,15 +223,21 @@ func (a *App) revokeMakeup(w http.ResponseWriter, r *http.Request, uid bson.Obje
 	if !good {
 		return
 	}
-	res, err := a.C("checkins").DeleteOne(r.Context(), bson.M{"userId": uid, "medId": m.ID, "date": in.Date, "slot": in.Time, "isMakeup": true})
-	if err != nil || res.DeletedCount == 0 {
+	var c Checkin
+	err := a.C("checkins").FindOneAndDelete(r.Context(), bson.M{"userId": uid, "medId": m.ID, "date": in.Date, "slot": in.Time, "isMakeup": true}).Decode(&c)
+	if err != nil {
 		fail(w, 404, "no makeup to revoke")
 		return
 	}
 	a.C("todos").UpdateMany(r.Context(), bson.M{"userId": uid, "kind": "med", "refId": m.ID, "slot": in.Time, "date": in.Date, "makeup": true},
 		bson.M{"$set": bson.M{"makeup": false}})
 	a.C("op_log").InsertOne(r.Context(), bson.M{"userId": uid, "op": "revoke_makeup", "medId": m.ID, "date": in.Date, "slot": in.Time, "at": time.Now()})
-	ok(w, bson.M{"status": "missed"})
+	// 恢复补记前的状态（未服记录在 skips 里一直保留）
+	st := "missed"
+	if c.MakeupFrom == "skipped" {
+		st = "skipped"
+	}
+	ok(w, bson.M{"status": st})
 }
 
 // GET /api/family/messages 家人的站内消息；涉及的时段若已补记，追加"已于……补记"
@@ -260,4 +278,82 @@ func (a *App) familyMessages(w http.ResponseWriter, r *http.Request, uid bson.Ob
 		out = append(out, map[string]any{"id": mm.ID, "patientId": mm.Patient, "date": mm.Date, "text": mm.Text, "createdAt": mm.At.In(CST), "makeupNotes": notes})
 	}
 	ok(w, out)
+}
+
+// ---------- 未服：用户主动标记"没吃" ----------
+
+func (a *App) skipSet(ctx context.Context, uid bson.ObjectID, from string) map[string]bool {
+	cur, _ := a.C("skips").Find(ctx, bson.M{"userId": uid, "date": bson.M{"$gte": from}})
+	var ss []struct {
+		Med  bson.ObjectID `bson:"medId"`
+		Date string        `bson:"date"`
+		Slot string        `bson:"slot"`
+	}
+	cur.All(ctx, &ss)
+	out := map[string]bool{}
+	for _, x := range ss {
+		out[x.Med.Hex()+x.Date+x.Slot] = true
+	}
+	return out
+}
+
+func (a *App) isSkipped(ctx context.Context, uid, med bson.ObjectID, date, slot string) bool {
+	n, _ := a.C("skips").CountDocuments(ctx, bson.M{"userId": uid, "medId": med, "date": date, "slot": slot})
+	return n > 0
+}
+
+// POST /api/meds/:id/skip { date, time } 标记"没吃"。只能标已到点（待服或漏服）且未打卡的时段，最近 N 天内。
+func (a *App) skip(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) {
+	var in slotIn
+	readJSON(r, &in)
+	if in.Date == "" {
+		in.Date = today()
+	}
+	m, good := a.makeupSlot(w, r, uid, in)
+	if !good {
+		return
+	}
+	st := slotStatus(in.Date, in.Time, time.Now().In(CST), false)
+	if st == "upcoming" {
+		fail(w, 400, "slot not yet due")
+		return
+	}
+	if n, _ := a.C("checkins").CountDocuments(r.Context(), bson.M{"userId": uid, "medId": m.ID, "date": in.Date, "slot": in.Time}); n > 0 {
+		fail(w, 409, "already taken")
+		return
+	}
+	_, err := a.C("skips").InsertOne(r.Context(), bson.M{"userId": uid, "medId": m.ID, "date": in.Date, "slot": in.Time,
+		"at": time.Now(), "scheduledAt": scheduledAt(in.Date, in.Time)})
+	if mongo.IsDuplicateKeyError(err) {
+		fail(w, 409, "already skipped")
+		return
+	}
+	if err != nil {
+		fail(w, 500, "db error")
+		return
+	}
+	a.C("todos").UpdateMany(r.Context(), bson.M{"userId": uid, "kind": "med", "refId": m.ID, "slot": in.Time, "date": in.Date},
+		bson.M{"$set": bson.M{"done": true, "skipped": true}})
+	a.C("op_log").InsertOne(r.Context(), bson.M{"userId": uid, "op": "skip", "medId": m.ID, "date": in.Date, "slot": in.Time, "at": time.Now()})
+	ok(w, bson.M{"status": "skipped"})
+}
+
+// DELETE /api/meds/:id/skip?date=&time= 撤销"没吃"
+func (a *App) unskip(w http.ResponseWriter, r *http.Request, uid bson.ObjectID) {
+	in := slotIn{Date: r.URL.Query().Get("date"), Time: r.URL.Query().Get("time")}
+	m, good := a.makeupSlot(w, r, uid, in)
+	if !good {
+		return
+	}
+	if n, _ := a.C("checkins").CountDocuments(r.Context(), bson.M{"userId": uid, "medId": m.ID, "date": in.Date, "slot": in.Time}); n > 0 {
+		fail(w, 409, "slot has a check-in; revoke the makeup first")
+		return
+	}
+	res, err := a.C("skips").DeleteOne(r.Context(), bson.M{"userId": uid, "medId": m.ID, "date": in.Date, "slot": in.Time})
+	if err != nil || res.DeletedCount == 0 {
+		fail(w, 404, "not skipped")
+		return
+	}
+	a.C("op_log").InsertOne(r.Context(), bson.M{"userId": uid, "op": "unskip", "medId": m.ID, "date": in.Date, "slot": in.Time, "at": time.Now()})
+	ok(w, bson.M{"status": slotStatus(in.Date, in.Time, time.Now().In(CST), false)})
 }

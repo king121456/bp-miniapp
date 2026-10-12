@@ -46,11 +46,14 @@
 - 只限本人调用，家人没有对应接口。服务端只返回数字，图片由前端用 canvas 画，服务端不保存。姓名不经过后端。
 
 ## 漏服补记（V1.2 5.8）
-时段状态：`upcoming` 还没到点，`pending` 待服（计划时间后 `MISS_WINDOW_MINUTES` 内，默认 120 分钟），`missed` 漏服，`taken` 已服。
+时段状态：`upcoming` 还没到点，`skipped` 未服（用户主动点了"没吃"），`pending` 待服（计划时间后 `MISS_WINDOW_MINUTES` 内，默认 120 分钟），`missed` 漏服，`taken` 已服。
 - `GET /api/meds/history?days=7`（最多 90）→ 每个计划时段 `{ medId, name, dose, date, time, scheduledAt, status, isMakeup, checkedAt?, recordedAt?, canMakeup, canRevoke, deleted }`，按时间倒序。
 - `GET /api/meds/makeup` → `{ days, count, items }`，首页"最近 7 天有 N 次未打卡"用 `count`。
 - `POST /api/meds/:id/makeup` `{ date: "2026-10-11", time: "08:00" }` → `{ status: "taken", isMakeup: true, recordedAt, scheduledAt }`。只能补最近 `MAKEUP_WINDOW_DAYS`（默认 7，含今天）内已漏服的计划时段；未来、待服、已服、计划外的时段返回 400，重复补记返回 409。
 - `DELETE /api/meds/:id/makeup?date=&time=` 撤销补记，恢复为漏服，写操作日志。
+- `POST /api/meds/:id/skip` `{ date?: 今天, time }` 标记"没吃"。只能标已到点、还没打卡的时段（待服或漏服），最近 7 天内；重复标返回 409。`DELETE /api/meds/:id/skip?date=&time=` 撤销。
+- 未服可以补记，规则同漏服；撤销补记后回到未服。未服算没完成，但不进家人漏服通知。history 每项多了 `canSkip`、`canUnskip`（家人视图没有）。
+- 补记不接收"实际服药时间"（V1.0 不做）。
 - 普通打卡 `POST /api/meds/:id/checkin` 遇到已漏服的时段返回 409 `slot missed, use makeup`。
 - 删除药品改为软删除，删除前的历史时段仍能补记。
 - 服药计划带版本：`PUT /api/meds/:id` 改了服药时间时，会追加一版从今天起生效的计划（同一天多次修改只保留最后一版）。历史时段、补记校验和报告的应服次数都按当天生效的那一版计算，改时间不会让以前的记录变成漏服。老数据第一次修改时自动补一版从创建日起的原计划。
