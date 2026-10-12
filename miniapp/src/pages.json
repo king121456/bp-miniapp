@@ -19,7 +19,7 @@
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
-    "navigationBarTitleText": "血压记录",
+    "navigationBarTitleText": "压压记",
     "navigationBarBackgroundColor": "#F5F7F6",
     "backgroundColor": "#F5F7F6"
   },

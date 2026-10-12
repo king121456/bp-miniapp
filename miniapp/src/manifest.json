@@ -1,5 +1,5 @@
 {
-    "name" : "血压记录",
+    "name" : "压压记",
     "appid" : "",
     "description" : "",
     "versionName" : "1.0.0",
@@ -70,7 +70,7 @@
     },
     "vueVersion" : "3",
     "h5" : {
-        "title" : "血压记录",
+        "title" : "压压记",
         "router" : { "mode" : "hash", "base" : "/bp-miniapp/app/" },
         "publicPath" : "/bp-miniapp/app/"
     }

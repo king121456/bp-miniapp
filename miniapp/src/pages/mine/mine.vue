@@ -34,6 +34,7 @@
       <view class="cell" @tap="exp"><view class="ic sm bg-g"><image src="/static/icons/download-g.svg" /></view><view class="flex1 lt"><view class="f14 c3">导出数据</view><view class="f10 c9">下载全部记录（JSON 文件）</view></view><image class="arrow" src="/static/icons/right-9.svg" /></view>
     </view>
     <view class="danger f14" @tap="logout"><image src="/static/icons/trash-6.svg" />删除全部数据并注销</view>
+    <view class="brand f12 c9"><image src="/static/brand/logo.png" />压压记 · 血压记录工具</view>
     <view class="f10 c9 ft">本工具仅用于记录，不提供诊断建议</view>
 
     <view class="mask" v-if="nmOpen" @tap="nmOpen = false"><view class="modal" @tap.stop><view class="f16 c0 b mt">修改昵称</view><view class="nmb"><input class="nmi f16 c0" type="nickname" v-model="nmIn" maxlength="20" placeholder="输入或使用微信昵称" placeholder-class="phc" @blur="e => nmIn = e.detail.value" /></view><view class="mbr"><view class="mb f16 c9 flex1" @tap="nmOpen = false">取消</view><view class="mb f16 cg b flex1" @tap="saveName">保存</view></view></view></view>
@@ -113,7 +114,8 @@ export default {
 .arrow { margin-left: 8rpx; }
 .danger { margin: 16rpx 32rpx 0; height: 96rpx; border-radius: 48rpx; background: #fff; color: #666; display: flex; align-items: center; justify-content: center; gap: 12rpx; box-shadow: 0 12rpx 40rpx rgba(16,60,48,.05); }
 .danger image { width: 32rpx; height: 32rpx; }
-.ft { text-align: center; margin: 28rpx 0 40rpx; }
+.ft { text-align: center; margin: 12rpx 0 40rpx; }
+.brand { display: flex; align-items: center; justify-content: center; gap: 10rpx; margin-top: 40rpx; } .brand image { width: 32rpx; height: 32rpx; border-radius: 8rpx; }
 .mask { position: fixed; inset: 0; background: rgba(0,0,0,.45); z-index: 99; display: flex; align-items: center; justify-content: center; }
 .modal { width: 640rpx; background: #fff; border-radius: 32rpx; overflow: hidden; }
 .mt { text-align: center; padding: 36rpx 0 16rpx; } .jb { height: 700rpx; padding: 0 32rpx; box-sizing: border-box; white-space: pre-wrap; word-break: break-all; }

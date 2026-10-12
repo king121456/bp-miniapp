@@ -2,8 +2,8 @@
   <view class="pg">
     <view class="safe-top"></view>
     <view class="deco"></view>
-    <view class="logo"><image src="/static/icons/heart-w.svg" /></view>
-    <view class="h1">血压记录</view>
+    <image class="logo" src="/static/brand/logo.png" />
+    <view class="h1">压压记</view>
     <view class="sub f14 c6">记录血压 · 提醒用药 · 家人共享</view>
     <view class="card">
       <view class="pt" v-for="p in points" :key="p.t">
@@ -52,8 +52,7 @@ export default {
 <style lang="scss" scoped>
 .pg { min-height: 100vh; background: linear-gradient(180deg, #D7F7EA 0%, #EEF9F4 40%, #F5F7F6 70%); position: relative; overflow: hidden; padding-bottom: 60rpx; }
 .deco { position: absolute; top: -120rpx; right: -160rpx; width: 520rpx; height: 520rpx; border-radius: 50%; background: radial-gradient(circle, rgba(167,255,185,.55), rgba(112,232,201,0) 70%); }
-.logo { position: relative; width: 176rpx; height: 176rpx; border-radius: 52rpx; margin: 100rpx auto 36rpx; background: linear-gradient(140deg, #34C9A3, #10C495 50%, #62E17D); display: flex; align-items: center; justify-content: center; box-shadow: 0 32rpx 68rpx -12rpx rgba(16,196,149,.45); }
-.logo image { width: 96rpx; height: 96rpx; }
+.logo { position: relative; display: block; width: 176rpx; height: 176rpx; border-radius: 40rpx; margin: 100rpx auto 36rpx; box-shadow: 0 32rpx 68rpx -12rpx rgba(16,196,149,.45); }
 .h1 { text-align: center; font-size: 40rpx; font-weight: 700; color: #000; }
 .sub { text-align: center; margin: 8rpx 0 64rpx; }
 .pt { display: flex; align-items: center; gap: 24rpx; } .pt + .pt { margin-top: 24rpx; }

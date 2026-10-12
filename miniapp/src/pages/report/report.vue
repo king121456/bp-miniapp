@@ -32,11 +32,11 @@ const CC = { am: '#10C495', pm: '#7B6CF0', t1: '#333333', t2: '#666666', t3: '#9
 const iround = v => v == null ? null : Math.round(v)
 function cardHeight(r) {
   const meds = Math.min((r.meds || []).length, 4)
-  let h = 104 + 24 + 222 + 20 + 150 + 20 + 128 + 20 + (64 + Math.max(meds, 1) * 22) + 20
+  let h = 116 + 24 + 222 + 20 + 150 + 20 + 128 + 20 + (64 + Math.max(meds, 1) * 22) + 20
   if ((r.symptoms || []).length) h += 76
-  return h + 30
+  return h + 54
 }
-function drawCard(ctx, r, name, k) {
+function drawCard(ctx, r, name, k, img = {}) {
   const H = cardHeight(r), P = 20
   ctx.scale(k, k)
   const font = (size, bold) => { ctx.setFontSize(size); ctx.font = (bold ? 'bold ' : '') + size + 'px ' + (bold === 'num' ? '"DIN Alternate","Helvetica Neue",Arial,sans-serif' : 'sans-serif') }
@@ -47,13 +47,15 @@ function drawCard(ctx, r, name, k) {
   const ymd = t => { const d = new Date(t), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) }
   // 背景 + 头部
   ctx.setFillStyle('#FFFFFF'); ctx.fillRect(0, 0, CW, H)
-  const g = ctx.createLinearGradient(0, 0, CW, 104); g.addColorStop(0, '#10C495'); g.addColorStop(0.5, '#34C9A3'); g.addColorStop(1, '#62E17D')
-  ctx.setFillStyle(g); ctx.fillRect(0, 0, CW, 104)
-  txt('就诊报告卡', P, 38, 20, '#fff', 'left', true)
-  txt('生成于 ' + ymd(r.generatedAt), CW - P, 38, 10, 'rgba(255,255,255,0.85)', 'right')
-  txt('姓名  ' + (name || '—'), P, 64, 13, '#fff')
-  txt(`${r.from} 至 ${r.to} · 共 ${r.days} 天`, P, 86, 12, 'rgba(255,255,255,0.9)')
-  let y = 104 + 24
+  const g = ctx.createLinearGradient(0, 0, CW, 116); g.addColorStop(0, '#10C495'); g.addColorStop(0.5, '#34C9A3'); g.addColorStop(1, '#62E17D')
+  ctx.setFillStyle(g); ctx.fillRect(0, 0, CW, 116)
+  if (img.white) ctx.drawImage(img.white, P, 12, 15, 18)
+  txt('压压记', P + (img.white ? 20 : 0), 26, 11, '#fff', 'left', true)
+  txt('生成于 ' + ymd(r.generatedAt), CW - P, 26, 10, 'rgba(255,255,255,0.85)', 'right')
+  txt('就诊报告卡', P, 56, 20, '#fff', 'left', true)
+  txt('姓名  ' + (name || '—'), P, 80, 13, '#fff')
+  txt(`${r.from} 至 ${r.to} · 共 ${r.days} 天`, P, 100, 12, 'rgba(255,255,255,0.9)')
+  let y = 116 + 24
   const S = r.series || []
   const has = S.filter(d => d.morning || d.evening), few = has.length > 0 && has.length <= 7
   const Pt = few ? has : S
@@ -122,7 +124,10 @@ function drawCard(ctx, r, name, k) {
     r.symptoms.slice(0, 6).forEach(s => { const t = `${s.name} ${s.count}次`, w = tw(t, 11) + 20; if (x + w > CW - P) return; rr(x, y, w, 24, 12, '#E8F8F2'); txt(t, x + w / 2, y + 16, 11, '#0C9A76', 'center'); x += w + 8 })
     y += 44
   }
-  hline(P, CW - P, H - 30, CC.line)
+  hline(P, CW - P, H - 52, CC.line)
+  const bt = '压压记 · 血压记录工具', bw = tw(bt, 10, true) + (img.color ? 18 : 0), bx = CW / 2 - bw / 2
+  if (img.color) ctx.drawImage(img.color, bx, H - 40, 13, 13)
+  txt(bt, bx + (img.color ? 18 : 0), H - 30, 10, CC.brand, 'left', true)
   txt(r.footer || '数据由用户自行记录，仅供就诊参考', CW / 2, H - 12, 10, CC.t3, 'center')
   return H
 }
@@ -156,7 +161,7 @@ export default {
     draw() {
       const r = this.rep; if (!r) return
       const H = Math.round(this.W * cardHeight(r) / CW)
-      const go = () => { const ctx = uni.createCanvasContext('rc', this); drawCard(ctx, r, this.name.trim(), this.W / CW); ctx.draw() }
+      const go = () => { const ctx = uni.createCanvasContext('rc', this); drawCard(ctx, r, this.name.trim(), this.W / CW, { white: '/static/brand/logo-white.png', color: '/static/brand/logo.png' }); ctx.draw() }
       if (H !== this.H) { this.H = H; this.$nextTick(() => setTimeout(go, 50)) } else go()
     },
     image() {
