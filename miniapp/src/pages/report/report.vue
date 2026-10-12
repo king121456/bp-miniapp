@@ -50,7 +50,7 @@ function drawCard(ctx, r, name, k, img = {}) {
   const g = ctx.createLinearGradient(0, 0, CW, 116); g.addColorStop(0, '#10C495'); g.addColorStop(0.5, '#34C9A3'); g.addColorStop(1, '#62E17D')
   ctx.setFillStyle(g); ctx.fillRect(0, 0, CW, 116)
   if (img.white) ctx.drawImage(img.white, P, 12, 15, 18)
-  txt('压压记', P + (img.white ? 20 : 0), 26, 11, '#fff', 'left', true)
+  txt('小压管家', P + (img.white ? 20 : 0), 26, 11, '#fff', 'left', true)
   txt('生成于 ' + ymd(r.generatedAt), CW - P, 26, 10, 'rgba(255,255,255,0.85)', 'right')
   txt('就诊报告卡', P, 56, 20, '#fff', 'left', true)
   txt('姓名  ' + (name || '—'), P, 80, 13, '#fff')
@@ -125,7 +125,7 @@ function drawCard(ctx, r, name, k, img = {}) {
     y += 44
   }
   hline(P, CW - P, H - 52, CC.line)
-  const bt = '压压记 · 血压记录工具', bw = tw(bt, 10, true) + (img.color ? 18 : 0), bx = CW / 2 - bw / 2
+  const bt = '小压管家 · 血压记录工具', bw = tw(bt, 10, true) + (img.color ? 18 : 0), bx = CW / 2 - bw / 2
   if (img.color) ctx.drawImage(img.color, bx, H - 40, 13, 13)
   txt(bt, bx + (img.color ? 18 : 0), H - 30, 10, CC.brand, 'left', true)
   txt(r.footer || '数据由用户自行记录，仅供就诊参考', CW / 2, H - 12, 10, CC.t3, 'center')
@@ -161,7 +161,7 @@ export default {
     draw() {
       const r = this.rep; if (!r) return
       const H = Math.round(this.W * cardHeight(r) / CW)
-      const go = () => { const ctx = uni.createCanvasContext('rc', this); drawCard(ctx, r, this.name.trim(), this.W / CW, { white: '/static/brand/logo-white.png', color: '/static/brand/logo.png' }); ctx.draw() }
+      const go = () => { const ctx = uni.createCanvasContext('rc', this); drawCard(ctx, r, this.name.trim(), this.W / CW, { white: '/static/brand/logo.png', color: '/static/brand/logo.png' }); ctx.draw() }
       if (H !== this.H) { this.H = H; this.$nextTick(() => setTimeout(go, 50)) } else go()
     },
     image() {

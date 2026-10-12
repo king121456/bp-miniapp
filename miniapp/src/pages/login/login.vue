@@ -3,7 +3,7 @@
     <view class="safe-top"></view>
     <view class="deco"></view>
     <image class="logo" src="/static/brand/logo.png" />
-    <view class="h1">压压记</view>
+    <view class="h1">小压管家</view>
     <view class="sub f14 c6">记录血压 · 提醒用药 · 家人共享</view>
     <view class="card">
       <view class="pt" v-for="p in points" :key="p.t">

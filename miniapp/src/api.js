@@ -1,7 +1,7 @@
 // 数据层：全部请求 Go 后端（见仓库 server/README.md）；本地只存登录 token、授权记录、昵称、身份等少量状态。
 // 后端地址：VITE_API_BASE（默认 http://127.0.0.1:8080）
-const ENV = (typeof import.meta !== 'undefined' && import.meta.env) || {}
-const BASE = (ENV.VITE_API_BASE || 'http://127.0.0.1:8080').replace(/\/$/, '')
+const ENV = import.meta.env || {}
+const BASE = (ENV.VITE_API_BASE || 'http://192.168.43.13:8080').replace(/\/$/, '')
 // 订阅消息模板 ID（公众平台申请后填入，与后端 WX_TPL_* 对应）
 export const SUBSCRIBE_TMPL_IDS = []
 const K = { consent: 'health_consent', invite: 'family_invite', profile: 'profile', role: 'role' }

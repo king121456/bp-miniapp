@@ -1,7 +1,7 @@
 <template>
   <view class="pg">
     <view class="safe-top"></view>
-    <view class="navh f20 c0 b">记录</view>
+    <view class="navh"></view>
     <view class="card rp" @tap="goReport"><view class="ic sm bg-g"><image src="/static/icons/chart-g.svg" /></view><view class="flex1 lt"><view class="f14 c0 b">就诊报告卡</view><view class="f10 c9">近7/30/90天汇总，保存图片给医生看</view></view><image class="arrow" src="/static/icons/right-9.svg" /></view>
     <bp-overview :records="records" @pick="pick" />
     <view style="height:40rpx"></view>
