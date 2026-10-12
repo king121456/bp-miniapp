@@ -9,8 +9,12 @@
     { "path": "pages/meds/edit", "style": { "navigationBarTitleText": "编辑药品" } },
     { "path": "pages/remind/remind", "style": { "navigationBarTitleText": "测量提醒" } },
     { "path": "pages/family/family", "style": { "navigationBarTitleText": "家人共享" } },
-    { "path": "pages/family/view", "style": { "navigationBarTitleText": "家人视角预览" } },
+    { "path": "pages/family/view", "style": { "navigationBarTitleText": "家人视角" } },
     { "path": "pages/report/report", "style": { "navigationBarTitleText": "就诊报告卡" } },
+    { "path": "pages/role/role", "style": { "navigationStyle": "custom", "navigationBarTitleText": "选择身份" } },
+    { "path": "pages/family/home", "style": { "navigationStyle": "custom", "navigationBarTitleText": "我关注的家人" } },
+    { "path": "pages/meds/makeup", "style": { "navigationBarTitleText": "补记" } },
+    { "path": "pages/visit/visit", "style": { "navigationBarTitleText": "复诊提醒" } },
     { "path": "pages/privacy/privacy", "style": { "navigationBarTitleText": "隐私说明" } }
   ],
   "globalStyle": {

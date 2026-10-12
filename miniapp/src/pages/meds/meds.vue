@@ -11,24 +11,22 @@
       </view>
     </view>
     <view class="pad"><view class="btn" @tap="edit('')">添加药品</view></view>
-    <view class="sh"><text class="t">打卡记录</text><text class="f12 c9">近 30 天</text></view>
-    <view class="card lst">
-      <view v-if="!cks.length" class="empty">暂无打卡</view>
-      <view class="cell" v-for="(c, i) in cks.slice(0, limit)" :key="i">
-        <view class="dot"><image src="/static/icons/check-l.svg" /></view>
-        <view class="flex1 mn"><view class="f14 c0">{{ c.name }}</view><view class="f10 c9">计划 {{ c.time }}</view></view>
-        <text class="f12 c6">{{ dl(c.at) }} <text class="num">{{ hm(c.at) }}</text></text>
-      </view>
-      <view v-if="cks.length > limit" class="more f12 cg" @tap="limit += 20">查看更多</view>
-    </view>
+    <view class="sh"><text class="t">服药历史</text><text class="f12 c9">近 {{ days }} 天 · 7 天内未打卡可补记</text></view>
+    <med-history :slots="slots" @pick="s => pick = s" />
+    <view v-if="days < 30" class="more f12 cg" @tap="more">查看更早记录</view>
+    <slot-sheet :item="pick" @close="pick = null" @done="reload" />
   </view>
 </template>
 <script>
-import { guard, listMedDefs, listCheckins, dayLabel, hhmm } from '../../api.js'
+import { guard, listMedDefs, listSlots } from '../../api.js'
 export default {
-  data: () => ({ meds: [], cks: [], limit: 10 }),
-  async onShow() { if (!guard()) return; this.meds = await listMedDefs(); this.cks = await listCheckins() },
-  methods: { edit(id) { uni.navigateTo({ url: '/pages/meds/edit' + (id ? '?id=' + id : '') }) }, dl: dayLabel, hm: hhmm }
+  data: () => ({ meds: [], slots: [], days: 7, pick: null }),
+  async onShow() { if (!guard()) return; this.meds = await listMedDefs(); this.reload() },
+  methods: {
+    edit(id) { uni.navigateTo({ url: '/pages/meds/edit' + (id ? '?id=' + id : '') }) },
+    async reload() { this.pick = null; this.slots = await listSlots(this.days) },
+    more() { this.days = 30; this.reload() }
+  }
 }
 </script>
 <style lang="scss" scoped>
@@ -40,5 +38,5 @@ export default {
 .tm { background: #E3F8F1; color: #10C495; padding: 2rpx 14rpx; border-radius: 16rpx; }
 .pad { padding: 8rpx 32rpx 48rpx; }
 .dot { width: 48rpx; height: 48rpx; border-radius: 24rpx; background: #EAF9EC; display: flex; align-items: center; justify-content: center; } .dot image { width: 28rpx; height: 28rpx; }
-.more { text-align: center; padding: 20rpx 0 12rpx; border-top: 1rpx solid #F0F2F1; }
+.more { text-align: center; padding: 8rpx 0 24rpx; }
 </style>

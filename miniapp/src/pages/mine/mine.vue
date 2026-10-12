@@ -23,6 +23,10 @@
         <view class="f14 c0 b">{{ e.t }}</view><view class="f10 c9">{{ e.s }}</view>
       </view>
     </view>
+    <view class="sh f16 c0 b">身份</view>
+    <view class="card grp">
+      <view class="cell" @tap="toFamily"><view class="ic sm bg-o"><image src="/static/icons/eye-o.svg" /></view><view class="flex1 lt"><view class="f14 c3">切换为「我是家人」</view><view class="f10 c9">{{ pats ? '正在关注 ' + pats + ' 位家人' : '输入邀请码，只读查看家人的记录' }}</view></view><image class="arrow" src="/static/icons/right-9.svg" /></view>
+    </view>
     <view class="sh f16 c0 b">数据与隐私</view>
     <view class="card grp">
       <view class="cell" @tap="go('/pages/report/report')"><view class="ic sm bg-g"><image src="/static/icons/chart-g.svg" /></view><view class="flex1 lt"><view class="f14 c3">就诊报告卡</view><view class="f10 c9">生成一张图片，看病时给医生看</view></view><image class="arrow" src="/static/icons/right-9.svg" /></view>
@@ -37,9 +41,9 @@
   </view>
 </template>
 <script>
-import { guard, getProfile, listRecords, listMedDefs, listFamily, getRemind, exportData, deleteAccount, clearDemo, getConsent, dayKey } from '../../api.js'
+import { getVisit, listPatients, setRole, guard, getProfile, listRecords, listMedDefs, listFamily, getRemind, exportData, deleteAccount, clearDemo, getConsent, dayKey } from '../../api.js'
 export default {
-  data: () => ({ name: '', total: 0, days: 0, meds: 0, fam: 0, rem: '', json: '', ver: '' }),
+  data: () => ({ visit: '', pats: 0, name: '', total: 0, days: 0, meds: 0, fam: 0, rem: '', json: '', ver: '' }),
   computed: { g1() { return [
     { t: '用药管理', i: 'pill-g', bg: 'bg-g', u: '/pages/meds/meds', s: this.meds ? this.meds + ' 种药' : '未添加' },
     { t: '测量提醒', i: 'bell-b', bg: 'bg-b', u: '/pages/remind/remind', s: this.rem },
@@ -49,10 +53,13 @@ export default {
     this.name = getProfile().nickname; this.ver = (getConsent() || {}).version
     const r = await listRecords(); this.total = r.length; this.days = new Set(r.map(x => dayKey(x.time))).size
     this.meds = (await listMedDefs()).length; this.fam = (await listFamily()).length
+    const v = await getVisit(); this.visit = v ? v.date.slice(5).replace('-', '/') + ' 复诊' : '未设置'
+    this.pats = (await listPatients().catch(() => [])).length
     const m = await getRemind(); const n = [m.morning.on, m.evening.on].filter(Boolean).length; this.rem = n ? '已开启 ' + n + ' 个' : '未开启'
   },
   methods: {
     go(url) { uni.navigateTo({ url }) },
+    toFamily() { setRole('family'); uni.reLaunch({ url: '/pages/family/home' }) },
     async exp() {
       const s = JSON.stringify(await exportData(), null, 2)
       // #ifdef H5

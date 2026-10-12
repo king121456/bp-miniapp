@@ -1,5 +1,6 @@
 <template>
   <view class="pg">
+    <view class="vb f12" v-if="fromVisit"><image src="/static/icons/calendar-g.svg" />复诊用：统计截止到今天（{{ to }}），可改选其他范围</view>
     <view class="card">
       <view class="seg">
         <view v-for="o in opts" :key="o.k" class="sg f14" :class="{ on: mode === o.k }" @tap="pickMode(o.k)">{{ o.t }}</view>
@@ -22,7 +23,7 @@
   </view>
 </template>
 <script>
-import { guard, getReport, getReportName, setReportName } from '../../api.js'
+import { guard, getReport, getReportName, setReportName, getRole } from '../../api.js'
 const p2 = n => String(n).padStart(2, '0')
 const ymd = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate())
 const BW = 360, BH = 640 // 设计坐标（9:16）
@@ -31,9 +32,15 @@ export default {
   data() {
     const t = new Date(), f = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 29)
     const W = Math.min(360, (uni.getSystemInfoSync().windowWidth || 375) - 32)
-    return { opts: [{ k: 7, t: '近7天' }, { k: 30, t: '近30天' }, { k: 90, t: '近90天' }, { k: 'custom', t: '自定义' }], mode: 30, from: ymd(f), to: ymd(t), today: ymd(t), name: '', rep: null, err: '', W, H: Math.round(W * 16 / 9) }
+    return { opts: [{ k: 7, t: '近7天' }, { k: 30, t: '近30天' }, { k: 90, t: '近90天' }, { k: 'custom', t: '自定义' }], mode: 30, from: ymd(f), to: ymd(t), today: ymd(t), name: '', rep: null, err: '', fromVisit: false, W, H: Math.round(W * 16 / 9) }
   },
-  onLoad() { if (!guard()) return; this.name = getReportName(); this.load() },
+  onLoad(o) {
+    if (!guard()) return; this.name = getReportName()
+    if (getRole() === 'family') { uni.showToast({ title: '家人端不提供导出', icon: 'none' }); return setTimeout(() => uni.navigateBack(), 800) }
+    // 从复诊提醒进入：结束日期为今天，默认往前 30 天（自定义范围，可改选）
+    if (o && o.from === 'visit') { this.fromVisit = true; this.mode = 'custom' }
+    this.load()
+  },
   methods: {
     pickMode(k) { this.mode = k; this.load() },
     setRange(f, t) {
@@ -95,11 +102,12 @@ export default {
       txt('晚间', 250, y + 4, 10, C.sub); txt(av(r.evening), 250, y + 24, 12, C.ink)
       txt(`共 ${r.count} 次测量 · 血压 mmHg · 心率 次/分`, 28, y + 42, 10, C.sub)
       // 用药
-      y = 476; txt('用药与完成率', 20, y, 14, C.ink, 'left', true)
-      const ad = r.adherence || {}; txt(ad.rate != null ? `总完成率 ${ad.rate}%（${ad.taken}/${ad.planned}）` : '未设置用药', BW - 20, y, 10, C.sub, 'right')
-      const ms = (r.meds || []).slice(0, 4)
-      ms.forEach((m, i) => { const yy = y + 20 + i * 18; txt(`${m.name}${m.dose ? ' ' + m.dose : ''} · ${(m.times || []).join(' ')}`.slice(0, 26), 20, yy, 12, '#444'); txt(m.rate != null ? m.rate + '%' : '—', BW - 20, yy, 12, C.ink, 'right') })
-      if ((r.meds || []).length > 4) txt(`另有 ${r.meds.length - 4} 种药品未列出`, 20, y + 20 + 4 * 18, 10, C.sub)
+      y = 472; txt('用药与完成率', 20, y, 14, C.ink, 'left', true)
+      const ad = r.adherence || {}
+      txt(ad.planned ? `已服 ${ad.taken} 次 / 应服 ${ad.planned} 次（${ad.rate}%），其中补记 ${ad.makeup || 0} 次` : '未设置用药', 20, y + 18, 11, '#444')
+      const ms = (r.meds || []).slice(0, 3)
+      ms.forEach((m, i) => { const yy = y + 36 + i * 16; txt(`${m.name}${m.dose ? ' ' + m.dose : ''} · ${(m.times || []).join(' ')}`.slice(0, 28), 20, yy, 11, '#666') })
+      if ((r.meds || []).length > 3) txt(`另有 ${r.meds.length - 3} 种药品未列出`, 20, y + 36 + 3 * 16, 10, C.sub)
       // 症状
       y = 576; txt('记录的症状', 20, y, 14, C.ink, 'left', true)
       const sy = (r.symptoms || []).map(s => `${s.name} ${s.count} 次`).join('  ·  ') || '无'
@@ -143,6 +151,7 @@ export default {
 </script>
 <style lang="scss" scoped>
 .pg { min-height: 100vh; background: linear-gradient(180deg, #DDF8EE 0, #F5F7F6 400rpx); padding: 24rpx 0 40rpx; }
+.vb { display: flex; align-items: center; gap: 12rpx; margin: 0 32rpx 20rpx; padding: 16rpx 24rpx; border-radius: 20rpx; background: #E3F8F1; color: #0C9A76; } .vb image { width: 32rpx; height: 32rpx; flex: none; }
 .seg { display: flex; background: #F2F4F3; border-radius: 24rpx; padding: 6rpx; }
 .sg { flex: 1; text-align: center; height: 64rpx; line-height: 64rpx; border-radius: 20rpx; color: #666; }
 .sg.on { background: #fff; color: #10C495; font-weight: 600; box-shadow: 0 4rpx 12rpx rgba(16,60,48,.08); }

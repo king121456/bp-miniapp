@@ -4,6 +4,12 @@
     <view class="safe-top"></view>
     <view class="hd"><view class="f12 c6">{{ dateStr }}</view><view class="f20 c0 b">{{ greet }}，{{ name }}</view></view>
 
+
+    <view class="vt" v-if="visit && visitTodo">
+      <view class="vh"><view class="ic bg-b"><image src="/static/icons/calendar-b.svg" /></view><view class="flex1 vtx"><view class="f12 c9">复诊待办</view><view class="f20 c0 b">{{ visitLine }}</view></view></view>
+      <view class="f14 c6 vsub" v-if="visitPlace">{{ visitPlace }}</view>
+      <view class="btn vbtn" @tap="toCard">生成就诊卡片</view>
+    </view>
     <view class="hero" v-if="latest" @tap="toRecord">
       <view class="t"><text>今日血压</text><view class="pill"><image src="/static/icons/check-w.svg" />{{ latestTime }} 已测量</view></view>
       <view class="bp"><text class="v num">{{ latest.sys }}</text><text class="s num">/</text><text class="v num">{{ latest.dia }}</text><text class="u">mmHg</text></view>
@@ -33,39 +39,74 @@
       <view class="cell" v-for="m in meds" :key="m.id + m.time">
         <view class="ic bg-g"><image src="/static/icons/pill-g.svg" /></view>
         <view class="flex1 mn"><view class="f14 c0 b">{{ m.name }}</view><view class="f12 c9"><text class="num">{{ m.time }}</text> · {{ m.dose }}</view></view>
-        <view class="ck done" v-if="m.done"><image src="/static/icons/check-l.svg" />已服</view>
+        <view class="ck done" v-if="m.done" @tap="m.makeup && (pick = m)"><image src="/static/icons/check-l.svg" />已服<text v-if="m.makeup" class="mk">补记</text></view>
+        <view class="ck mkb" v-else-if="m.canMakeup" @tap="pick = m">补记</view>
         <view class="ck todo" v-else @tap="doCheck(m)">打卡</view>
       </view>
+      <view class="miss" v-if="missCount" @tap="go('/pages/meds/makeup')"><text class="f14 c3 flex1">最近 7 天有 <text class="num b">{{ missCount }}</text> 次未打卡</text><text class="f12 cg">去补记</text><image class="arrow" src="/static/icons/right-g.svg" /></view>
+    </view>
+
+    <view class="card vc" v-if="visit && !visitTodo" @tap="go('/pages/visit/visit')">
+      <view class="ic bg-b"><image src="/static/icons/calendar-b.svg" /></view>
+      <view class="flex1 vtx"><view class="f16 c0 b">下次复诊：{{ md(visit.date) }}（{{ leftStr }}）</view><view class="f12 c9" v-if="visitPlace">{{ visitPlace }}</view></view>
+      <image class="arrow" src="/static/icons/right-9.svg" />
+    </view>
+    <view class="card vc" v-if="!visit && askNext">
+      <view class="ic bg-b"><image src="/static/icons/calendar-b.svg" /></view>
+      <view class="flex1 vtx" @tap="go('/pages/visit/visit?new=1')"><view class="f14 c0 b">要记下下次复诊日期吗？</view><view class="f12 cg">去记下</view></view>
+      <view class="x f20 c9" @tap="closeAsk">×</view>
     </view>
 
     <view class="mini">
       <view class="card" @tap="go('/pages/family/family')"><view class="ic bg-o"><image src="/static/icons/family-o.svg" /></view><view><view class="f14 c0 b">家人共享</view><view class="f10 c9">{{ famCount ? famCount + ' 位家人在关注' : '邀请家人查看' }}</view></view></view>
       <view class="card" @tap="go('/pages/remind/remind')"><view class="ic bg-b"><image src="/static/icons/bell-b.svg" /></view><view><view class="f14 c0 b">测量提醒</view><view class="f10 c9 num">{{ remindStr }}</view></view></view>
     </view>
+    <view class="mini">
+      <view class="card" @tap="go('/pages/visit/visit')"><view class="ic bg-b"><image src="/static/icons/calendar-b.svg" /></view><view><view class="f14 c0 b">复诊提醒</view><view class="f10 c9">{{ visit ? md(visit.date) + ' 复诊' : '记下复诊日期' }}</view></view></view>
+      <view class="card" @tap="go('/pages/report/report')"><view class="ic bg-g"><image src="/static/icons/card-g.svg" /></view><view><view class="f14 c0 b">就诊报告卡</view><view class="f10 c9">看病时给医生看</view></view></view>
+    </view>
+    <slot-sheet :item="pick" @close="pick = null" @done="afterMakeup" />
     <view style="height:40rpx"></view>
   </view>
 </template>
 <script>
-import { guard, listRecords, listMeds, checkin, listFamily, getRemind, getProfile, isToday, hhmm, weekStart, WEEK } from '../../api.js'
+import { guard, listRecords, listMeds, checkin, listFamily, getRemind, getProfile, isToday, hhmm, weekStart, WEEK, makeupCount, getVisit, visitRemindAt, daysUntil, shouldAskNextVisit, dismissAskNextVisit, getRole } from '../../api.js'
 export default {
-  data: () => ({ records: [], meds: [], famCount: 0, remind: null, name: '', now: Date.now() }),
+  data: () => ({ records: [], meds: [], famCount: 0, remind: null, name: '', now: Date.now(), missCount: 0, visit: null, askNext: false, pick: null }),
   computed: {
     dateStr() { const d = new Date(this.now); return `${d.getMonth() + 1}月${d.getDate()}日 星期${WEEK[d.getDay()]}` },
     greet() { const h = new Date(this.now).getHours(); return h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 13 ? '中午好' : h < 18 ? '下午好' : '晚上好' },
     today() { return this.records.filter(r => isToday(r.time)) },
     latest() { return this.today[0] }, latestTime() { return hhmm(this.latest.time) },
     todayCount() { return this.today.length }, weekCount() { const w = weekStart(); return this.records.filter(r => r.time >= w).length },
+    // 复诊待办：从提醒时间（前一天 19:00）起到复诊当天结束显示（PRD 5.9）
+    visitTodo() { return !!this.visit && this.now >= visitRemindAt(this.visit) },
+    leftStr() { const n = daysUntil(this.visit.date); return n === 0 ? '今天' : n === 1 ? '明天' : '还有 ' + n + ' 天' },
+    visitLine() { const n = daysUntil(this.visit.date); return (n === 0 ? '今天' : '明天') + '（' + this.md(this.visit.date) + '）复诊' },
+    visitPlace() { const v = this.visit; return v ? [v.hospital, v.department].filter(Boolean).join(' ') : '' },
     doneCount() { return this.meds.filter(m => m.done).length },
     remindStr() { const r = this.remind; if (!r) return ''; const a = [r.morning.on && r.morning.time, r.evening.on && r.evening.time].filter(Boolean); return a.length ? a.join(' / ') : '未开启' }
   },
-  onShow() { if (guard()) this.load() },
+  onShow() {
+    if (!guard()) return
+    const role = getRole()
+    if (!role) return uni.reLaunch({ url: '/pages/role/role' })
+    if (role === 'family') return uni.reLaunch({ url: '/pages/family/home' })
+    this.load()
+  },
   methods: {
     async load() {
       this.now = Date.now(); this.name = getProfile().nickname
       ;[this.records, this.meds, this.remind] = await Promise.all([listRecords(), listMeds(), getRemind()])
       this.famCount = (await listFamily()).length
+      this.missCount = await makeupCount()
+      this.visit = await getVisit(); this.askNext = shouldAskNextVisit()
     },
     async doCheck(m) { await checkin(m.id, m.time); uni.showToast({ title: '已打卡', icon: 'success' }); this.meds = await listMeds() },
+    async afterMakeup() { this.pick = null; this.meds = await listMeds(); this.missCount = await makeupCount() },
+    md(s) { const [, m, d] = s.split('-').map(Number); return `${m}月${d}日` },
+    closeAsk() { dismissAskNextVisit(); this.askNext = false },
+    toCard() { uni.navigateTo({ url: '/pages/report/report?from=visit' }) },
     toEntry() { uni.navigateTo({ url: '/pages/entry/entry' }) },
     toMeds() { uni.navigateTo({ url: '/pages/meds/meds' }) },
     toRecord() { uni.switchTab({ url: '/pages/record/record' }) },
@@ -99,6 +140,15 @@ export default {
 .ck image { width: 24rpx; height: 24rpx; }
 .ck.done { color: #31CD4C; background: #EAF9EC; }
 .ck.todo { color: #fff; background: linear-gradient(120deg, #34C9A3, #62E17D); box-shadow: 0 8rpx 20rpx -4rpx rgba(16,196,149,.5); }
+.mk { margin-left: 8rpx; background: #F2F4F3; color: #666; padding: 2rpx 12rpx; border-radius: 12rpx; font-size: 20rpx; font-weight: 400; }
+.ck.mkb { color: #10C495; background: #E3F8F1; }
+.miss { display: flex; align-items: center; gap: 8rpx; margin-top: 4rpx; padding: 24rpx 0 12rpx; border-top: 1rpx solid #F0F2F1; }
+.vt { position: relative; margin: 0 32rpx 24rpx; padding: 32rpx; border-radius: 32rpx; background: #fff; box-shadow: 0 2rpx 4rpx rgba(16,60,48,.04), 0 12rpx 40rpx rgba(16,60,48,.06); }
+.vh { display: flex; align-items: center; } .vtx { margin-left: 24rpx; }
+.vsub { margin: 12rpx 0 0 104rpx; }
+.vbtn { margin-top: 28rpx; }
+.vc { display: flex; align-items: center; }
+.x { padding: 0 8rpx 0 24rpx; }
 .mini { display: flex; gap: 24rpx; margin: 0 32rpx 24rpx; }
 .mini .card { margin: 0; flex: 1; display: flex; gap: 20rpx; align-items: center; padding: 28rpx; }
 </style>
