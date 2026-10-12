@@ -11,9 +11,8 @@
     </view>
     <view class="note f12 c6">
       <view class="b c3 f14 nt">关于提醒</view>
-      <view>· 设置会保存在本机，到点时在小程序内提醒你测量血压。</view>
+      <view>· 设置会同步到服务器，到点时提醒你测量血压。</view>
       <view>· 正式版需要你在微信中允许「订阅消息」后，才能收到微信服务通知推送；每次允许对应一次推送。</view>
-      <view>· 当前网页演示版不会真正推送通知。</view>
     </view>
   </view>
 </template>

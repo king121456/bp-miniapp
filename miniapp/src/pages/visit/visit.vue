@@ -33,7 +33,7 @@
       <picker mode="time" :value="form.remindTime" @change="e => form.remindTime = e.detail.value">
         <view class="cell"><text class="f14 c3 flex1">提醒时间</text><text class="f14 c0">复诊前一天 <text class="num">{{ form.remindTime }}</text></text><image class="arrow" src="/static/icons/right-9.svg" /></view>
       </picker>
-      <view class="f10 c9 tip">{{ local ? '演示版：到提醒时间后在首页显示复诊待办。' : '保存时会请求微信提醒授权；不能推送时，首页会显示复诊待办。' }}家人只能看到日期、医院和科室，看不到备注。</view>
+      <view class="f10 c9 tip">保存时会请求微信提醒授权；不能推送时，首页会显示复诊待办。家人只能看到日期、医院和科室，看不到备注。</view>
       <view class="acts in"><view class="btn ghost flex1" @tap="editing = false">取消</view><view class="btn flex1" :class="{ dis: !form.date }" @tap="save">保存复诊日期</view></view>
     </view>
 
@@ -51,17 +51,17 @@
   </view>
 </template>
 <script>
-import { guard, USE_LOCAL, getVisit, listVisitHistory, saveVisit, cancelVisit, deleteVisit, daysUntil, visitRemindAt, VISIT_REMIND_DEFAULT, dismissAskNextVisit, fmtTime, WEEK } from '../../api.js'
+import { guard, getVisit, listVisitHistory, saveVisit, cancelVisit, deleteVisit, daysUntil, visitRemindAt, VISIT_REMIND_DEFAULT, fmtTime, WEEK } from '../../api.js'
 const p2 = n => String(n).padStart(2, '0')
 const ymd = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate())
 const pd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
 export default {
-  data() { const t = new Date(); return { up: null, hist: [], editing: false, form: {}, local: USE_LOCAL, today: ymd(t), maxDate: ymd(new Date(t.getFullYear() + 1, t.getMonth(), t.getDate())) } },
+  data() { const t = new Date(); return { up: null, hist: [], editing: false, form: {}, today: ymd(t), maxDate: ymd(new Date(t.getFullYear() + 1, t.getMonth(), t.getDate())) } },
   computed: {
     remindStr() { const v = this.up; if (!v) return ''; const at = visitRemindAt(v); return at > Date.now() ? '将于 ' + fmtTime(at) + ' 提醒' : '已在首页显示复诊待办' }
   },
   onLoad(o) { if (o && o.new) this.$nextTick(() => this.edit(false)) },
-  onShow() { if (guard()) { dismissAskNextVisit(); this.load() } },
+  onShow() { if (guard()) this.load() },
   methods: {
     async load() { [this.up, this.hist] = await Promise.all([getVisit(), listVisitHistory()]) },
     md(s) { const d = pd(s); return `${d.getMonth() + 1}月${d.getDate()}日` }, wk(s) { return WEEK[pd(s).getDay()] },

@@ -32,7 +32,6 @@
       <view class="cell" @tap="go('/pages/report/report')"><view class="ic sm bg-g"><image src="/static/icons/chart-g.svg" /></view><view class="flex1 lt"><view class="f14 c3">就诊报告卡</view><view class="f10 c9">生成一张图片，看病时给医生看</view></view><image class="arrow" src="/static/icons/right-9.svg" /></view>
       <view class="cell" @tap="go('/pages/privacy/privacy')"><view class="ic sm bg-g"><image src="/static/icons/shield-g.svg" /></view><view class="flex1 lt"><view class="f14 c3">隐私说明</view><view class="f10 c9">数据怎么存、谁能看</view></view><image class="arrow" src="/static/icons/right-9.svg" /></view>
       <view class="cell" @tap="exp"><view class="ic sm bg-g"><image src="/static/icons/download-g.svg" /></view><view class="flex1 lt"><view class="f14 c3">导出数据</view><view class="f10 c9">下载全部记录（JSON 文件）</view></view><image class="arrow" src="/static/icons/right-9.svg" /></view>
-      <view class="cell" @tap="clear"><view class="ic sm bg-k"><image src="/static/icons/refresh-6.svg" /></view><view class="flex1 lt"><view class="f14 c3">清除示例数据</view><view class="f10 c9">清空后从零开始记录</view></view><image class="arrow" src="/static/icons/right-9.svg" /></view>
     </view>
     <view class="danger f14" @tap="logout"><image src="/static/icons/trash-6.svg" />删除全部数据并注销</view>
     <view class="f10 c9 ft">本工具仅用于记录，不提供诊断建议</view>
@@ -41,7 +40,7 @@
   </view>
 </template>
 <script>
-import { getVisit, listPatients, setRole, guard, getProfile, listRecords, listMedDefs, listFamily, getRemind, exportData, deleteAccount, clearDemo, getConsent, dayKey } from '../../api.js'
+import { getVisit, listPatients, setRole, guard, getProfile, listRecords, listMedDefs, listFamily, getRemind, exportData, deleteAccount, getConsent, dayKey } from '../../api.js'
 export default {
   data: () => ({ visit: '', pats: 0, name: '', total: 0, days: 0, meds: 0, fam: 0, rem: '', json: '', ver: '' }),
   computed: { g1() { return [
@@ -71,7 +70,6 @@ export default {
       this.json = s
       // #endif
     },
-    clear() { uni.showModal({ title: '清除示例数据', content: '将清空当前的血压记录、药品、打卡和家人数据，确定吗？', confirmColor: '#10C495', success: r => { if (r.confirm) { clearDemo(); uni.showToast({ title: '已清除', icon: 'none' }); this.$nextTick(() => uni.switchTab({ url: '/pages/index/index' })) } } }) },
     logout() { uni.showModal({ title: '删除全部数据并注销', content: '你的所有记录、用药、提醒和家人绑定都会被删除，且无法恢复。确定继续吗？', confirmText: '删除', confirmColor: '#E5484D', success: async r => { if (r.confirm) { await deleteAccount(); uni.reLaunch({ url: '/pages/login/login' }) } } }) }
   }
 }

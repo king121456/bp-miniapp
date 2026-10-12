@@ -11,7 +11,7 @@ uni-app（Vue3 + Vite）微信小程序前端 + Go/MongoDB 后端。同一套前
   - `src/pages/report/` 就诊报告卡（canvas 生成 9:16 图片，姓名只存本机）
   - `tools/icons.py` 生成线性图标 SVG 和 tabBar PNG
 - `server/`：Go + MongoDB 后端，接口说明见 [server/README.md](server/README.md)
-- `docs/`：GitHub Pages。`docs/app/` 为 H5 构建产物（本地模式），`docs/mockups/` 为静态设计稿
+- `docs/`：GitHub Pages。`docs/app/` 为 H5 构建产物（旧的本地演示模式构建，当前代码已无本地模式，需配好可访问的后端后重新构建），`docs/mockups/` 为静态设计稿
 
 ## 运行前端
 ```bash
@@ -20,18 +20,17 @@ npm install
 npm run dev:mp-weixin   # 用微信开发者工具导入 dist/dev/mp-weixin
 npm run dev:h5          # 浏览器预览
 npm run build:mp-weixin # 产物 dist/build/mp-weixin
-npm run build:h5        # 产物 dist/build/h5，复制到 docs/app/ 即可发布
+npm run build:h5        # 产物 dist/build/h5（需要可访问的后端）
 ```
 也可以用 HBuilderX 打开 `miniapp/` 目录运行到微信小程序。发布前在 `src/manifest.json` 的 `mp-weixin.appid` 填入小程序 AppID。
 
-## 切换到后端
-默认 `USE_LOCAL=true`（全部存本地，GitHub Pages 上的演示即此模式）。通过 Vite 环境变量切换：
+## 连接后端
+前端所有数据都通过 Go 后端读写（没有本地/演示模式），本地只保存登录 token 等少量状态。后端地址由 `VITE_API_BASE` 指定，默认 `http://127.0.0.1:8080`：
 
 ```bash
 # 临时
-VITE_USE_LOCAL=false VITE_API_BASE=https://api.example.com npm run build:mp-weixin
-# 或在 miniapp/ 下新建 .env.production.local（已被 .gitignore 忽略，不要提交）
-VITE_USE_LOCAL=false
+VITE_API_BASE=https://api.example.com npm run build:mp-weixin
+# 或在 miniapp/ 下参照 .env.example 新建 .env.production.local（已被 .gitignore 忽略，不要提交）
 VITE_API_BASE=https://api.example.com
 ```
 - 小程序端用 `uni.login` 拿 code 调 `/api/auth/login`；H5 没有微信登录，会发送 `h5-dev`，只在后端 `APP_ENV=dev` 时可用。

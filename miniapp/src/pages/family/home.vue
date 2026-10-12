@@ -21,13 +21,12 @@
       <view class="btn" :class="{ dis: code.length !== 6 }" @tap="bind">确认关注</view>
     </view>
     <view class="sw f14 c6" @tap="switchRole"><image src="/static/icons/refresh-6.svg" />切换为「我是患者」</view>
-    <view class="f10 c9 ft" v-if="local">演示版：家人数据为本地模拟</view>
   </view>
 </template>
 <script>
-import { guard, USE_LOCAL, listPatients, listPatientRecords, listPatientSlots, getPatientVisit, bindFamily, setRole, fmtTime } from '../../api.js'
+import { guard, listPatients, listPatientRecords, listPatientSlots, getPatientVisit, bindFamily, setRole, fmtTime } from '../../api.js'
 export default {
-  data: () => ({ list: [], code: '', local: USE_LOCAL }),
+  data: () => ({ list: [], code: '' }),
   onShow() { if (guard()) { setRole('family'); this.load() } },
   methods: {
     async load() {
@@ -61,5 +60,4 @@ export default {
 .code { height: 96rpx; background: #F5F7F6; border-radius: 24rpx; text-align: center; font-size: 40rpx; letter-spacing: 8rpx; }
 .bt { margin: 16rpx 0 24rpx; line-height: 1.6; }
 .sw { display: flex; align-items: center; justify-content: center; gap: 12rpx; margin: 16rpx 32rpx 0; height: 96rpx; border-radius: 48rpx; background: #fff; box-shadow: 0 12rpx 40rpx rgba(16,60,48,.05); } .sw image { width: 32rpx; height: 32rpx; }
-.ft { text-align: center; margin-top: 24rpx; }
 </style>

@@ -22,7 +22,6 @@
       <view class="flex1 mn"><view class="f14 c0 b">预览家人看到的页面</view><view class="f12 c9">只读，可查看记录和变化图表</view></view>
       <image class="arrow" src="/static/icons/right-9.svg" />
     </view>
-    <view class="f10 c9 ft">演示版：邀请码和家人列表为本地模拟数据</view>
   </view>
 </template>
 <script>
@@ -51,5 +50,4 @@ export default {
 .mn { margin-left: 24rpx; } .rel { margin-left: 12rpx; font-weight: 400; }
 .ub { padding: 10rpx 20rpx; border-radius: 28rpx; background: #F2F4F3; }
 .pv { display: flex; align-items: center; }
-.ft { text-align: center; margin: 24rpx 0 48rpx; }
 </style>

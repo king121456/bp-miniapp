@@ -53,11 +53,6 @@
       <view class="flex1 vtx"><view class="f16 c0 b">下次复诊：{{ md(visit.date) }}（{{ leftStr }}）</view><view class="f12 c9" v-if="visitPlace">{{ visitPlace }}</view></view>
       <image class="arrow" src="/static/icons/right-9.svg" />
     </view>
-    <view class="card vc" v-if="!visit && askNext">
-      <view class="ic bg-b"><image src="/static/icons/calendar-b.svg" /></view>
-      <view class="flex1 vtx" @tap="go('/pages/visit/visit?new=1')"><view class="f14 c0 b">要记下下次复诊日期吗？</view><view class="f12 cg">去记下</view></view>
-      <view class="x f20 c9" @tap="closeAsk">×</view>
-    </view>
 
     <view class="mini">
       <view class="card" @tap="go('/pages/family/family')"><view class="ic bg-o"><image src="/static/icons/family-o.svg" /></view><view><view class="f14 c0 b">家人共享</view><view class="f10 c9">{{ famCount ? famCount + ' 位家人在关注' : '邀请家人查看' }}</view></view></view>
@@ -72,9 +67,9 @@
   </view>
 </template>
 <script>
-import { guard, listRecords, listMeds, checkin, listFamily, getRemind, getProfile, isToday, hhmm, weekStart, WEEK, makeupCount, skipSlot, getVisit, visitRemindAt, daysUntil, shouldAskNextVisit, dismissAskNextVisit, getRole } from '../../api.js'
+import { guard, listRecords, listMeds, checkin, listFamily, getRemind, getProfile, isToday, hhmm, weekStart, WEEK, makeupCount, skipSlot, getVisit, visitRemindAt, daysUntil, getRole } from '../../api.js'
 export default {
-  data: () => ({ records: [], meds: [], famCount: 0, remind: null, name: '', now: Date.now(), missCount: 0, visit: null, askNext: false, pick: null }),
+  data: () => ({ records: [], meds: [], famCount: 0, remind: null, name: '', now: Date.now(), missCount: 0, visit: null, pick: null }),
   computed: {
     dateStr() { const d = new Date(this.now); return `${d.getMonth() + 1}月${d.getDate()}日 星期${WEEK[d.getDay()]}` },
     greet() { const h = new Date(this.now).getHours(); return h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 13 ? '中午好' : h < 18 ? '下午好' : '晚上好' },
@@ -102,7 +97,7 @@ export default {
       ;[this.records, this.meds, this.remind] = await Promise.all([listRecords(), listMeds(), getRemind()])
       this.famCount = (await listFamily()).length
       this.missCount = await makeupCount()
-      this.visit = await getVisit(); this.askNext = shouldAskNextVisit()
+      this.visit = await getVisit()
     },
     async doCheck(m) { await checkin(m.id, m.time); uni.showToast({ title: '已打卡', icon: 'success' }); this.meds = await listMeds() },
     async doSkip(m) {
@@ -111,7 +106,6 @@ export default {
     },
     async afterMakeup() { this.pick = null; this.meds = await listMeds(); this.missCount = await makeupCount() },
     md(s) { const [, m, d] = s.split('-').map(Number); return `${m}月${d}日` },
-    closeAsk() { dismissAskNextVisit(); this.askNext = false },
     toCard() { uni.navigateTo({ url: '/pages/report/report?from=visit' }) },
     toEntry() { uni.navigateTo({ url: '/pages/entry/entry' }) },
     toMeds() { uni.navigateTo({ url: '/pages/meds/meds' }) },
@@ -157,7 +151,6 @@ export default {
 .vsub { margin: 12rpx 0 0 104rpx; }
 .vbtn { margin-top: 28rpx; }
 .vc { display: flex; align-items: center; }
-.x { padding: 0 8rpx 0 24rpx; }
 .mini { display: flex; gap: 24rpx; margin: 0 32rpx 24rpx; }
 .mini .card { margin: 0; flex: 1; display: flex; gap: 20rpx; align-items: center; padding: 28rpx; }
 </style>
