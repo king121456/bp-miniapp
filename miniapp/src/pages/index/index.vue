@@ -48,10 +48,18 @@
       <view class="miss" v-if="missCount" @tap="go('/pages/meds/makeup')"><text class="f14 c3 flex1">最近 7 天有 <text class="num b">{{ missCount }}</text> 次未打卡</text><text class="f12 cg">去补记</text><image class="arrow" src="/static/icons/right-g.svg" /></view>
     </view>
 
-    <view class="card vc" v-if="visit && !visitTodo" @tap="go('/pages/visit/visit')">
+    <view class="card vcard" v-if="visit && !visitTodo">
+      <view class="vc" @tap="go('/pages/visit/visit')">
+        <view class="ic bg-b"><image src="/static/icons/calendar-b.svg" /></view>
+        <view class="flex1 vtx"><view class="f12 c9">下次复诊</view><view class="f20 c0 b">{{ md(visit.date) }}<text class="f12 cg vl">{{ leftStr }}</text></view><view class="f12 c9" v-if="visitPlace">{{ visitPlace }}</view></view>
+        <image class="arrow" src="/static/icons/right-9.svg" />
+      </view>
+      <view class="btn vbtn" @tap="toCard">生成就诊卡片</view>
+    </view>
+    <view class="card vc" v-else-if="!visit && visitLoaded" @tap="go('/pages/visit/visit?new=1')">
       <view class="ic bg-b"><image src="/static/icons/calendar-b.svg" /></view>
-      <view class="flex1 vtx"><view class="f16 c0 b">下次复诊：{{ md(visit.date) }}（{{ leftStr }}）</view><view class="f12 c9" v-if="visitPlace">{{ visitPlace }}</view></view>
-      <image class="arrow" src="/static/icons/right-9.svg" />
+      <view class="flex1 vtx"><view class="f16 c0 b">设置下次复诊日期</view><view class="f12 c9">前一天提醒你，还能生成就诊卡片给医生看</view></view>
+      <view class="f12 cg">去设置</view><image class="arrow" src="/static/icons/right-g.svg" />
     </view>
 
     <view class="mini">
@@ -69,7 +77,7 @@
 <script>
 import { guard, listRecords, listMeds, checkin, listFamily, getRemind, getProfile, isToday, hhmm, weekStart, WEEK, makeupCount, skipSlot, getVisit, visitRemindAt, daysUntil, getRole } from '../../api.js'
 export default {
-  data: () => ({ records: [], meds: [], famCount: 0, remind: null, name: '', now: Date.now(), missCount: 0, visit: null, pick: null }),
+  data: () => ({ records: [], meds: [], famCount: 0, remind: null, name: '', now: Date.now(), missCount: 0, visit: null, visitLoaded: false, pick: null }),
   computed: {
     dateStr() { const d = new Date(this.now); return `${d.getMonth() + 1}月${d.getDate()}日 星期${WEEK[d.getDay()]}` },
     greet() { const h = new Date(this.now).getHours(); return h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 13 ? '中午好' : h < 18 ? '下午好' : '晚上好' },
@@ -97,7 +105,7 @@ export default {
       ;[this.records, this.meds, this.remind] = await Promise.all([listRecords(), listMeds(), getRemind()])
       this.famCount = (await listFamily()).length
       this.missCount = await makeupCount()
-      this.visit = await getVisit()
+      this.visit = await getVisit(); this.visitLoaded = true
     },
     async doCheck(m) { await checkin(m.id, m.time); uni.showToast({ title: '已打卡', icon: 'success' }); this.meds = await listMeds() },
     async doSkip(m) {
@@ -151,6 +159,7 @@ export default {
 .vsub { margin: 12rpx 0 0 104rpx; }
 .vbtn { margin-top: 28rpx; }
 .vc { display: flex; align-items: center; }
+.vcard .vbtn { margin-top: 24rpx; } .vl { margin-left: 12rpx; font-weight: 400; }
 .mini { display: flex; gap: 24rpx; margin: 0 32rpx 24rpx; }
 .mini .card { margin: 0; flex: 1; display: flex; gap: 20rpx; align-items: center; padding: 28rpx; }
 </style>

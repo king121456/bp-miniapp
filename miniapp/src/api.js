@@ -48,7 +48,7 @@ export const getConsent = () => uni.getStorageSync(K.consent) || null
 export function guard() { if (!hasConsent()) { uni.reLaunch({ url: '/pages/login/login' }); return false } return true }
 export async function login(nickname = '王阿姨') {
   const consent = { agreedAt: Date.now(), version: CONSENT_VERSION }
-  let code = 'h5-dev' // H5 无微信登录，仅供后端 APP_ENV=dev 联调
+  let code = 'h5-dev' // H5 无微信登录，占位 code；配置真实 AppID 的后端不会接受，联调请用微信开发者工具或真机
   // #ifdef MP-WEIXIN
   code = (await uni.login({ provider: 'weixin' })).code
   // #endif
@@ -108,8 +108,11 @@ export const visitRemindAt = v => { const d = parseYmd(v.date); const [h, m] = (
 export const daysUntil = date => Math.round((parseYmd(date) - new Date(new Date().setHours(0, 0, 0, 0))) / 864e5)
 const toVisit = v => v && { ...v, date: v.date || v.visitDate, remindTime: v.remindTime || VISIT_REMIND_DEFAULT }
 const ymdOf = s => typeof s === 'string' ? s.slice(0, 10) : s
-export async function getVisit() { return toVisit(((await req('/api/visits')) || {}).upcoming || null) }
-export async function listVisitHistory() { return (((await req('/api/visits')) || {}).history || []).map(toVisit) }
+// GET /api/visits → { upcoming: Visit|null, history: Visit[] }；Visit { id, visitDate, hospital, department, note, remindTime, remindAt, status, pushStatus, todoId? }
+export async function listVisits() { const d = (await req('/api/visits')) || {}; return { upcoming: toVisit(d.upcoming || null), history: (d.history || []).map(toVisit) } }
+// 即将到来的复诊：status=upcoming 且日期 ≥ 今天
+export async function getVisit() { const v = (await listVisits()).upcoming; return v && v.date && v.date.slice(0, 10) >= ymd(new Date()) ? { ...v, date: v.date.slice(0, 10) } : null }
+export async function listVisitHistory() { return (await listVisits()).history }
 // 保存复诊：v.id 存在则修改；否则新增。已有即将到来的复诊且未传 replace 时抛出 { conflict: 原复诊 }；replace=true 时原记录改为「已取消」进入历史
 export async function saveVisit(v, replace = false) {
   const rb = { visitDate: v.date, hospital: (v.hospital || '').slice(0, 30), department: (v.department || '').slice(0, 20), note: (v.note || '').slice(0, 100), remindTime: v.remindTime || VISIT_REMIND_DEFAULT }
