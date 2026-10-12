@@ -26,8 +26,106 @@
 import { guard, getReport, getReportName, setReportName, getRole, getProfile } from '../../api.js'
 const p2 = n => String(n).padStart(2, '0')
 const ymd = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate())
-const BW = 360, BH = 640 // 设计坐标（9:16）
-const C = { am: '#37A5E6', pm: '#8A6FD8', ink: '#222', sub: '#888', line: '#EEF1F0', brand: '#10C495' }
+// 报告卡绘制：高度随内容变化（宽 360 设计坐标）
+const CW = 360
+const CC = { am: '#10C495', pm: '#7B6CF0', t1: '#333333', t2: '#666666', t3: '#999999', line: '#EEF1F0', soft: '#F5F8F7', brand: '#10C495' }
+const iround = v => v == null ? null : Math.round(v)
+function cardHeight(r) {
+  const meds = Math.min((r.meds || []).length, 4)
+  let h = 104 + 24 + 222 + 20 + 150 + 20 + 128 + 20 + (64 + Math.max(meds, 1) * 22) + 20
+  if ((r.symptoms || []).length) h += 76
+  return h + 30
+}
+function drawCard(ctx, r, name, k) {
+  const H = cardHeight(r), P = 20
+  ctx.scale(k, k)
+  const font = (size, bold) => { ctx.setFontSize(size); ctx.font = (bold ? 'bold ' : '') + size + 'px ' + (bold === 'num' ? '"DIN Alternate","Helvetica Neue",Arial,sans-serif' : 'sans-serif') }
+  const txt = (s, x, y, size, color, align = 'left', bold) => { font(size, bold); ctx.setFillStyle(color); ctx.setTextAlign(align); ctx.fillText(String(s), x, y) }
+  const tw = (s, size, bold) => { font(size, bold); return ctx.measureText(String(s)).width }
+  const rr = (x, y, w, h, rad, color) => { ctx.setFillStyle(color); ctx.beginPath(); ctx.moveTo(x + rad, y); ctx.lineTo(x + w - rad, y); ctx.arc(x + w - rad, y + rad, rad, -Math.PI / 2, 0); ctx.lineTo(x + w, y + h - rad); ctx.arc(x + w - rad, y + h - rad, rad, 0, Math.PI / 2); ctx.lineTo(x + rad, y + h); ctx.arc(x + rad, y + h - rad, rad, Math.PI / 2, Math.PI); ctx.lineTo(x, y + rad); ctx.arc(x + rad, y + rad, rad, Math.PI, Math.PI * 1.5); ctx.closePath(); ctx.fill() }
+  const hline = (x1, x2, y, color, w = 0.5, dash) => { ctx.setStrokeStyle(color); ctx.setLineWidth(w); ctx.setLineDash(dash || [], 0); ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke(); ctx.setLineDash([], 0) }
+  const ymd = t => { const d = new Date(t), p = n => String(n).padStart(2, '0'); return d.getFullYear() + '-' + p(d.getMonth() + 1) + '-' + p(d.getDate()) }
+  // 背景 + 头部
+  ctx.setFillStyle('#FFFFFF'); ctx.fillRect(0, 0, CW, H)
+  const g = ctx.createLinearGradient(0, 0, CW, 104); g.addColorStop(0, '#10C495'); g.addColorStop(0.5, '#34C9A3'); g.addColorStop(1, '#62E17D')
+  ctx.setFillStyle(g); ctx.fillRect(0, 0, CW, 104)
+  txt('就诊报告卡', P, 38, 20, '#fff', 'left', true)
+  txt('生成于 ' + ymd(r.generatedAt), CW - P, 38, 10, 'rgba(255,255,255,0.85)', 'right')
+  txt('姓名  ' + (name || '—'), P, 64, 13, '#fff')
+  txt(`${r.from} 至 ${r.to} · 共 ${r.days} 天`, P, 86, 12, 'rgba(255,255,255,0.9)')
+  let y = 104 + 24
+  const S = r.series || []
+  const has = S.filter(d => d.morning || d.evening), few = has.length > 0 && has.length <= 7
+  const Pt = few ? has : S
+  // 图表：标题行 / 说明行 / 绘图区 / 日期行
+  const chart = (y0, plotH, keys, title, unit, note) => {
+    txt(title, P, y0 + 14, 15, CC.t1, 'left', true); txt(unit, P + tw(title, 15, true) + 6, y0 + 14, 10, CC.t3)
+    // 图例（右上）
+    const lg = (x, col, dash, label) => { ctx.setStrokeStyle(col); ctx.setLineWidth(2); ctx.setLineDash(dash, 0); ctx.beginPath(); ctx.moveTo(x, y0 + 10); ctx.lineTo(x + 16, y0 + 10); ctx.stroke(); ctx.setLineDash([], 0); ctx.setFillStyle(col); ctx.beginPath(); ctx.arc(x + 8, y0 + 10, 2.5, 0, 2 * Math.PI); ctx.fill(); txt(label, x + 21, y0 + 14, 10, CC.t2) }
+    lg(CW - P - 86, CC.am, [], '早间'); lg(CW - P - 40, CC.pm, [4, 3], '晚间')
+    if (note) txt(note, P, y0 + 32, 10, CC.t3)
+    const top = y0 + (note ? 52 : 36), bot = top + plotH, L = P + 30, R = CW - P - 8
+    const vals = []; Pt.forEach(d => ['morning', 'evening'].forEach(p => d[p] && keys.forEach(kk => d[p][kk] != null && vals.push(d[p][kk]))))
+    let lo = vals.length ? Math.min(...vals) : 60, hi = vals.length ? Math.max(...vals) : 140
+    lo = Math.floor((lo - 8) / 10) * 10; hi = Math.ceil((hi + 8) / 10) * 10; hi = lo + Math.max(30, Math.ceil((hi - lo) / 30) * 30) // 3 格，每格整十
+    const Y = v => bot - (v - lo) / (hi - lo) * plotH
+    const X = i => few ? L + (i + 0.5) * (R - L) / Pt.length : Pt.length > 1 ? L + i * (R - L) / (Pt.length - 1) : (L + R) / 2
+    for (let i = 0; i <= 3; i++) { const v = lo + (hi - lo) * i / 3, yy = Y(v); hline(L, R, yy, CC.line, 0.5, i ? [3, 3] : []); txt(Math.round(v), L - 8, yy + 3.5, 9, CC.t3, 'right') }
+    // 日期行（独立一行）
+    const dy = bot + 16
+    if (few) { let last = -1e9; Pt.forEach((d, i) => { const x = X(i), s = d.date.slice(5); if (x - last >= tw(s, 9) + 6) { txt(s, x, dy, 9, CC.t3, 'center'); last = x } }) }
+    else if (S.length) { txt(S[0].date.slice(5), L, dy, 9, CC.t3, 'left'); txt(S[S.length - 1].date.slice(5), R, dy, 9, CC.t3, 'right') }
+    if (!vals.length) txt('这段时间没有记录', (L + R) / 2, (top + bot) / 2 + 4, 11, CC.t3, 'center')
+    for (const [p, col, dash] of [['morning', CC.am, []], ['evening', CC.pm, [4, 3]]]) for (const kk of keys) {
+      ctx.setStrokeStyle(col); ctx.setLineWidth(1.6); ctx.setLineDash(dash, 0); let open = false; ctx.beginPath()
+      Pt.forEach((d, i) => { const v = d[p] && d[p][kk]; if (v == null) return; open ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)); open = true })
+      ctx.stroke(); ctx.setLineDash([], 0)
+      Pt.forEach((d, i) => {
+        const v = d[p] && d[p][kk]; if (v == null) return
+        const x = X(i), yy = Y(v), rad = few ? 4 : Pt.length > 40 ? 1.5 : 2.5
+        ctx.setFillStyle('#fff'); ctx.beginPath(); ctx.arc(x, yy, rad + 1.5, 0, 2 * Math.PI); ctx.fill()
+        ctx.setFillStyle(col); ctx.beginPath(); ctx.arc(x, yy, rad, 0, 2 * Math.PI); ctx.fill()
+        if (few) { const below = kk === 'dia'; const ox = p === 'evening' && d.morning && d.morning[kk] != null ? 14 : 0; txt(Math.round(v), x + ox, below ? yy + 15 : yy - 8, 10, col, 'center', 'num') }
+      })
+    }
+    return dy + 4
+  }
+  y = chart(y, 130, ['sys', 'dia'], '血压', 'mmHg', '每天上方的点为收缩压（高压），下方为舒张压（低压）')
+  y += 20; hline(P, CW - P, y, CC.line); y += 20
+  y = chart(y, 74, ['hr'], '心率', '次/分') ; y += 20
+  // 平均值：三格
+  txt('平均值', P, y + 14, 15, CC.t1, 'left', true); y += 28
+  const cw = (CW - P * 2 - 16) / 3
+  ;[['全部平均', r.average], ['早间（0–12点）', r.morning], ['晚间（12–24点）', r.evening]].forEach(([lab, a], i) => {
+    const x = P + i * (cw + 8); rr(x, y, cw, 76, 10, CC.soft)
+    txt(lab, x + 10, y + 18, 10, CC.t3)
+    if (a) { txt(`${iround(a.sys)}/${iround(a.dia)}`, x + 10, y + 46, 20, i ? CC.t1 : CC.brand, 'left', 'num'); txt(a.hr != null ? `心率 ${iround(a.hr)}` : '心率 —', x + 10, y + 64, 10, CC.t2) }
+    else txt('暂无记录', x + 10, y + 46, 12, CC.t3)
+  })
+  y += 76 + 18; txt(`共 ${r.count} 次测量 · 血压单位 mmHg · 心率单位 次/分`, P, y, 10, CC.t3); y += 26
+  hline(P, CW - P, y - 6, CC.line); y += 14
+  // 用药
+  const ad = r.adherence || {}, ms = (r.meds || []).slice(0, 4)
+  txt('用药与完成率', P, y + 14, 15, CC.t1, 'left', true)
+  if (ad.planned) { const pc = iround(ad.rate) + '%'; txt(pc, CW - P, y + 18, 22, CC.brand, 'right', 'num'); txt(`已服 ${ad.taken} / 应服 ${ad.planned} 次${ad.makeup ? '，补记 ' + ad.makeup + ' 次' : ''}`, P, y + 36, 11, CC.t2) }
+  else txt('未设置用药', P, y + 36, 11, CC.t3)
+  y += 56
+  ms.forEach(m => { y += 22; txt(`${m.name}${m.dose ? ' ' + m.dose : ''}`.slice(0, 16), P, y, 12, CC.t1); txt(`${(m.times || []).join(' ')}${m.rate != null ? '   ' + iround(m.rate) + '%' : ''}`, CW - P, y, 11, CC.t2, 'right') })
+  if (!ms.length) y += 22
+  if ((r.meds || []).length > 4) txt(`另有 ${r.meds.length - 4} 种未列出`, P, y + 16, 10, CC.t3)
+  y += 28
+  // 症状
+  if ((r.symptoms || []).length) {
+    hline(P, CW - P, y - 8, CC.line); y += 12
+    txt('记录的症状', P, y + 14, 15, CC.t1, 'left', true); y += 30
+    let x = P
+    r.symptoms.slice(0, 6).forEach(s => { const t = `${s.name} ${s.count}次`, w = tw(t, 11) + 20; if (x + w > CW - P) return; rr(x, y, w, 24, 12, '#E8F8F2'); txt(t, x + w / 2, y + 16, 11, '#0C9A76', 'center'); x += w + 8 })
+    y += 44
+  }
+  hline(P, CW - P, H - 30, CC.line)
+  txt(r.footer || '数据由用户自行记录，仅供就诊参考', CW / 2, H - 12, 10, CC.t3, 'center')
+  return H
+}
 export default {
   data() {
     const t = new Date(), f = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 29)
@@ -57,72 +155,12 @@ export default {
     },
     draw() {
       const r = this.rep; if (!r) return
-      const ctx = uni.createCanvasContext('rc', this); const k = this.W / BW
-      ctx.scale(k, k)
-      const txt = (s, x, y, size, color, align = 'left', bold) => { ctx.setFontSize(size); ctx.setFillStyle(color); ctx.setTextAlign(align); ctx.font = (bold ? 'bold ' : '') + size + 'px sans-serif'; ctx.fillText(String(s), x, y) }
-      // 背景与头部
-      ctx.setFillStyle('#FFFFFF'); ctx.fillRect(0, 0, BW, BH)
-      const g = ctx.createLinearGradient(0, 0, BW, 96); g.addColorStop(0, '#10C495'); g.addColorStop(0.45, '#34C9A3'); g.addColorStop(1, '#62E17D')
-      ctx.setFillStyle(g); ctx.fillRect(0, 0, BW, 96)
-      txt('就诊报告卡', 20, 34, 20, '#fff', 'left', true)
-      txt(this.name.trim() ? '姓名：' + this.name.trim() : '姓名：', 20, 58, 14, '#fff')
-      txt(`记录时间 ${r.from} 至 ${r.to}（${r.days} 天）`, 20, 78, 12, '#fff')
-      const gd = new Date(r.generatedAt); txt('生成于 ' + ymd(gd), BW - 20, 34, 10, '#fff', 'right')
-      // 图例
-      const legend = (y) => {
-        ctx.setLineWidth(2); ctx.setStrokeStyle(C.am); ctx.setLineDash([], 0); ctx.beginPath(); ctx.moveTo(BW - 150, y - 4); ctx.lineTo(BW - 130, y - 4); ctx.stroke(); txt('早', BW - 126, y, 10, C.sub)
-        ctx.setStrokeStyle(C.pm); ctx.setLineDash([4, 3], 0); ctx.beginPath(); ctx.moveTo(BW - 100, y - 4); ctx.lineTo(BW - 80, y - 4); ctx.stroke(); ctx.setLineDash([], 0); txt('晚', BW - 76, y, 10, C.sub)
-      }
-      const S = r.series || []
-      // 有数据的天数少（≤7）时只画这些天，均匀铺开（1 天居中），避免挤在右边
-      const has = S.filter(d => d.morning || d.evening), few = has.length > 0 && has.length <= 7
-      const P = few ? has : S
-      const chart = (y0, h, keys, title, unit) => {
-        txt(title, 20, y0 + 12, 14, C.ink, 'left', true); txt(unit, 20 + (title.length * 14) + 4, y0 + 12, 10, C.sub); legend(y0 + 12)
-        const top = y0 + 22, bot = y0 + h, L = 44, R = BW - 20
-        const vals = []; P.forEach(d => ['morning', 'evening'].forEach(p => d[p] && keys.forEach(kk => d[p][kk] != null && vals.push(d[p][kk]))))
-        let lo = vals.length ? Math.min(...vals) : 60, hi = vals.length ? Math.max(...vals) : 140
-        lo = Math.floor((lo - 5) / 10) * 10; hi = Math.ceil((hi + 5) / 10) * 10; if (hi - lo < 20) hi = lo + 20
-        const Y = v => bot - (v - lo) / (hi - lo) * (bot - top), X = i => few ? L + (i + 0.5) * (R - L) / P.length : P.length > 1 ? L + i * (R - L) / (P.length - 1) : (L + R) / 2
-        ctx.setLineWidth(0.5); ctx.setStrokeStyle(C.line); ctx.setLineDash([], 0)
-        for (let i = 0; i <= 2; i++) { const v = lo + (hi - lo) * i / 2, y = Y(v); ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(R, y); ctx.stroke(); txt(Math.round(v), L - 6, y + 3, 10, C.sub, 'right') }
-        if (few) P.forEach((d, i) => txt(d.date.slice(5), X(i), bot + 12, 10, C.sub, 'center')); else if (S.length) { txt(S[0].date.slice(5), L, bot + 12, 10, C.sub, 'left'); txt(S[S.length - 1].date.slice(5), R, bot + 12, 10, C.sub, 'right') }
-        for (const [p, col, dash] of [['morning', C.am, []], ['evening', C.pm, [4, 3]]]) for (const kk of keys) {
-          ctx.setStrokeStyle(col); ctx.setFillStyle(col); ctx.setLineWidth(1.5); ctx.setLineDash(dash, 0)
-          let open = false; ctx.beginPath()
-          P.forEach((d, i) => { const v = d[p] && d[p][kk]; if (v == null) return; open ? ctx.lineTo(X(i), Y(v)) : ctx.moveTo(X(i), Y(v)); open = true }) // 跨过没测量的日子连线
-          ctx.stroke(); ctx.setLineDash([], 0)
-          P.forEach((d, i) => { const v = d[p] && d[p][kk]; if (v != null) { ctx.beginPath(); ctx.arc(X(i), Y(v), few ? 4 : P.length > 40 ? 1.5 : 2.5, 0, 2 * Math.PI); ctx.fill(); if (few) txt(Math.round(v), X(i), Y(v) - 7, 10, col, 'center') } })
-        }
-      }
-      chart(108, 150, ['sys', 'dia'], '血压', 'mmHg'); txt('上方为收缩压，下方为舒张压', BW / 2, 270, 10, C.sub, 'center')
-      chart(286, 80, ['hr'], '心率', '次/分')
-      // 均值
-      let y = 400; ctx.setFillStyle('#F5F7F6'); ctx.fillRect(16, y - 14, BW - 32, 64)
-      const av = (a) => a ? `${a.sys}/${a.dia}` + (a.hr != null ? ` · ${a.hr}` : '') : '暂无记录'
-      txt('全部平均', 28, y + 4, 10, C.sub); txt(av(r.average), 28, y + 24, 14, C.ink, 'left', true)
-      txt('早间（0–12点）', 140, y + 4, 10, C.sub); txt(av(r.morning), 140, y + 24, 12, C.ink)
-      txt('晚间', 250, y + 4, 10, C.sub); txt(av(r.evening), 250, y + 24, 12, C.ink)
-      txt(`共 ${r.count} 次测量 · 血压 mmHg · 心率 次/分`, 28, y + 42, 10, C.sub)
-      // 用药
-      y = 472; txt('用药与完成率', 20, y, 14, C.ink, 'left', true)
-      const ad = r.adherence || {}
-      txt(ad.planned ? `已服 ${ad.taken} 次 / 应服 ${ad.planned} 次（${ad.rate}%），其中补记 ${ad.makeup || 0} 次` : '未设置用药', 20, y + 18, 11, '#444')
-      const ms = (r.meds || []).slice(0, 3)
-      ms.forEach((m, i) => { const yy = y + 36 + i * 16; txt(`${m.name}${m.dose ? ' ' + m.dose : ''} · ${(m.times || []).join(' ')}`.slice(0, 28), 20, yy, 11, '#666') })
-      if ((r.meds || []).length > 3) txt(`另有 ${r.meds.length - 3} 种药品未列出`, 20, y + 36 + 3 * 16, 10, C.sub)
-      // 症状（没有记录症状时整块不显示）
-      if ((r.symptoms || []).length) {
-        y = 576; txt('记录的症状', 20, y, 14, C.ink, 'left', true)
-        txt(r.symptoms.map(s => `${s.name} ${s.count} 次`).join('  ·  ').slice(0, 30), 20, y + 18, 12, '#444')
-      }
-      // 页脚
-      ctx.setStrokeStyle(C.line); ctx.setLineWidth(0.5); ctx.beginPath(); ctx.moveTo(20, BH - 26); ctx.lineTo(BW - 20, BH - 26); ctx.stroke()
-      txt(r.footer || '数据由用户自行记录，仅供就诊参考', BW / 2, BH - 10, 10, C.sub, 'center')
-      ctx.draw()
+      const H = Math.round(this.W * cardHeight(r) / CW)
+      const go = () => { const ctx = uni.createCanvasContext('rc', this); drawCard(ctx, r, this.name.trim(), this.W / CW); ctx.draw() }
+      if (H !== this.H) { this.H = H; this.$nextTick(() => setTimeout(go, 50)) } else go()
     },
     image() {
-      return new Promise((ok, no) => uni.canvasToTempFilePath({ canvasId: 'rc', destWidth: 1080, destHeight: 1920, success: r => ok(r.tempFilePath), fail: no }, this))
+      return new Promise((ok, no) => uni.canvasToTempFilePath({ canvasId: 'rc', destWidth: 1080, destHeight: Math.round(1080 * this.H / this.W), success: r => ok(r.tempFilePath), fail: no }, this))
     },
     // #ifdef H5
     async download() {
