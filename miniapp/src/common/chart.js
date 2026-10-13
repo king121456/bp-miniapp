@@ -8,7 +8,7 @@ export function buildChart(records, days, W = 311, H = 170) {
   if (!pts.length) return { src: '', pts }
   const all = pts.flatMap(p => [p.s, p.d]); let lo = Math.floor((Math.min(...all) - 8) / 10) * 10, hi = Math.ceil((Math.max(...all) + 8) / 10) * 10
   const step = Math.max(10, Math.ceil((hi - lo) / 3 / 10) * 10); hi = lo + step * 3
-    const L = 28, R = W - 24, T = 10, B = H - 22
+  const L = 28, R = W - 24, T = 10, B = H - 22
   const x = i => pts.length === 1 ? (L + R) / 2 : L + (R - L) * i / (pts.length - 1)
   const y = v => B - (v - lo) / (hi - lo) * (B - T)
   let g = ''
@@ -25,8 +25,6 @@ export function buildChart(records, days, W = 311, H = 170) {
     const anchor = first && !last ? 'start' : last ? 'end' : 'middle'
     return `<text x="${x(i).toFixed(1)}" y="${H - 4}" font-size="10" fill="${last ? '#10C495' : '#999'}" text-anchor="${anchor}" font-family="Arial">${t}</text>`
   }).join('')
-  const every = Math.ceil(pts.length / 7)
-  const labels = pts.map((p, i) => { if ((pts.length - 1 - i) % every) return ''; const d = new Date(p.t); const last = i === pts.length - 1; const t = days === 7 ? WEEK[d.getDay()] : `${d.getMonth() + 1}/${d.getDate()}`; return `<text x="${x(i).toFixed(1)}" y="${H - 4}" font-size="10" fill="${last ? '#10C495' : '#999'}" text-anchor="middle" font-family="Arial">${t}</text>` }).join('')
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${W * 2}" height="${H * 2}" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="g1" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#10C495" stop-opacity=".22"/><stop offset="1" stop-color="#10C495" stop-opacity="0"/></linearGradient><linearGradient id="g2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#37A5E6" stop-opacity=".16"/><stop offset="1" stop-color="#37A5E6" stop-opacity="0"/></linearGradient></defs>${g}<path d="${area('s')}" fill="url(#g1)"/><path d="${area('d')}" fill="url(#g2)"/><path d="${line('s')}" fill="none" stroke="#10C495" stroke-width="2.2" stroke-linejoin="round"/><path d="${line('d')}" fill="none" stroke="#37A5E6" stroke-width="2.2" stroke-linejoin="round"/>${dots('s', '#10C495')}${dots('d', '#37A5E6')}${labels}</svg>`
   return { src: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(svg), pts }
 }
