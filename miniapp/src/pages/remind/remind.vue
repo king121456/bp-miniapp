@@ -2,7 +2,7 @@
   <view class="pg" v-if="r">
     <view class="card">
       <view class="cell" v-for="s in SL" :key="s.k">
-        <view class="ic" :class="s.bg"><image :src="'/static/icons/' + s.i + '.svg'" /></view>
+        <view class="ic" :class="s.bg || ''"><image :src="'/static/icons/' + s.i + '.svg'" /></view>
         <view class="flex1 mn"><view class="f14 c0 b">{{ s.t }}</view>
           <picker mode="time" :value="r[s.k].time" @change="e => upd(s.k, 'time', e.detail.value)"><view class="row"><text class="f20 num" :class="r[s.k].on ? 'c0' : 'c9'">{{ r[s.k].time }}</text><text class="f12 c9 ed">点击修改</text></view></picker>
         </view>

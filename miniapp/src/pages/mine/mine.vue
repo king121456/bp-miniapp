@@ -19,7 +19,7 @@
     <view class="sh f16 c0 b">常用功能</view>
     <view class="tiles">
       <view class="tile" v-for="e in g1" :key="e.t" @tap="go(e.u)">
-        <view class="ti" :class="e.bg"><image :src="'/static/icons/' + e.i + '.svg'" /></view>
+        <view class="ti" :class="e.bg || ''"><image :src="'/static/icons/' + e.i + '.svg'" /></view>
         <view class="f14 c0 b">{{ e.t }}</view><view class="f10 c9">{{ e.s }}</view>
       </view>
     </view>

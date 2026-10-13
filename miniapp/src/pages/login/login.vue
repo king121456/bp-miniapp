@@ -7,7 +7,7 @@
     <view class="sub f14 c6">记录血压 · 提醒用药 · 家人共享</view>
     <view class="card">
       <view class="pt" v-for="p in points" :key="p.t">
-        <view class="ic" :class="p.bg"><image :src="'/static/icons/' + p.i + '.svg'" /></view>
+        <view class="ic" :class="p.bg || ''"><image :src="'/static/icons/' + p.i + '.svg'" /></view>
         <view class="f14 c3">{{ p.t }}</view>
       </view>
     </view>
@@ -16,7 +16,7 @@
       <view class="f12 c6 flex1">我同意收集和保存我的血压、心率、身体感受和用药信息，仅供本人及我授权的家人查看。<text class="lk" @tap.stop="show = true">《健康数据隐私说明》</text></view>
     </view>
     <view class="pad"><view class="btn" :class="{ dis: !agree }" @tap="go">微信一键登录</view></view>
-    <view class="tip f12 c9">{{ agree ? '登录后会为你准备一些示例数据，可在「我的」中清除' : '请先勾选上方同意，才能开始使用' }}</view>
+    <view class="tip f12 c9">{{ agree ? '登录后即可开始记录血压' : '请先勾选上方同意，才能开始使用' }}</view>
 
     <view class="mask" v-if="show" @tap="show = false">
       <view class="modal" @tap.stop>
