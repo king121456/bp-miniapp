@@ -2,7 +2,7 @@
   <view class="pg">
     <view class="deco"></view>
     <view class="safe-top"></view>
-    <view class="hd"><view class="f12 c6">{{ dateStr }}</view><view class="f20 c0 b">{{ greet }}，{{ name }}</view></view>
+    <view class="hd"><view class="f12 c6">{{ dateStr }}</view><view class="f20 c0 b">{{ greet }}<text v-if="displayName">，{{ displayName }}</text></view></view>
 
 
     <view class="vt" v-if="visit && visitTodo">
@@ -71,12 +71,13 @@
   </view>
 </template>
 <script>
-import { guard, listRecords, listMeds, checkin, listFamily, getRemind, getProfile, isToday, hhmm, weekStart, WEEK, makeupCount, skipSlot, getVisit, visitRemindAt, daysUntil, getRole } from '../../api.js'
+import { guard, isLoggedIn, listRecords, listMeds, checkin, listFamily, getRemind, getProfile, isToday, hhmm, weekStart, WEEK, makeupCount, skipSlot, getVisit, visitRemindAt, daysUntil, getRole } from '../../api.js'
 export default {
-  data: () => ({ records: [], meds: [], famCount: 0, remind: null, name: '', now: Date.now(), missCount: 0, visit: null, visitLoaded: false, pick: null }),
+  data: () => ({ guest: false, records: [], meds: [], famCount: 0, remind: null, name: '', now: Date.now(), missCount: 0, visit: null, visitLoaded: false, pick: null }),
   computed: {
     dateStr() { const d = new Date(this.now); return `${d.getMonth() + 1}月${d.getDate()}日 星期${WEEK[d.getDay()]}` },
     greet() { const h = new Date(this.now).getHours(); return h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 13 ? '中午好' : h < 18 ? '下午好' : '晚上好' },
+    displayName() { return this.guest ? '' : (this.name || '') },
     today() { return this.records.filter(r => isToday(r.time)) },
     latest() { return this.today[0] }, latestTime() { return hhmm(this.latest.time) },
     todayCount() { return this.today.length }, weekCount() { const w = weekStart(); return this.records.filter(r => r.time >= w).length },
@@ -89,7 +90,12 @@ export default {
     remindStr() { const r = this.remind; if (!r) return ''; const a = [r.morning.on && r.morning.time, r.evening.on && r.evening.time].filter(Boolean); return a.length ? a.join(' / ') : '未开启' }
   },
   onShow() {
-    if (!guard()) return
+    if (!isLoggedIn()) {
+      this.guest = true; this.name = ''; this.records = []; this.meds = []; this.famCount = 0
+      this.remind = null; this.missCount = 0; this.visit = null; this.visitLoaded = true; this.pick = null
+      return
+    }
+    this.guest = false
     const role = getRole()
     if (!role) return uni.reLaunch({ url: '/pages/role/role' })
     if (role === 'family') return uni.reLaunch({ url: '/pages/family/home' })
@@ -103,18 +109,19 @@ export default {
       this.missCount = await makeupCount()
       this.visit = await getVisit(); this.visitLoaded = true
     },
-    async doCheck(m) { await checkin(m.id, m.time); uni.showToast({ title: '已打卡', icon: 'success' }); this.meds = await listMeds() },
+    async doCheck(m) { if (!guard()) return; await checkin(m.id, m.time); uni.showToast({ title: '已打卡', icon: 'success' }); this.meds = await listMeds() },
     async doSkip(m) {
+      if (!guard()) return
       try { await skipSlot(m); uni.showToast({ title: '已记为未服', icon: 'none' }); this.afterMakeup() }
       catch (e) { uni.showToast({ title: (e && e.message) || '操作失败', icon: 'none' }) }
     },
     async afterMakeup() { this.pick = null; this.meds = await listMeds(); this.missCount = await makeupCount() },
-    md(s) { const [, m, d] = s.split('-').map(Number); return `${m}月${d}日` },
-    toCard() { uni.navigateTo({ url: '/pages/report/report?from=visit' }) },
-    toEntry() { uni.navigateTo({ url: '/pages/entry/entry' }) },
-    toMeds() { uni.navigateTo({ url: '/pages/meds/meds' }) },
+    md(s) { const [, m, d] = s.split('-').map(Number); return m + '月' + d + '日' },
+    toCard() { if (guard()) uni.navigateTo({ url: '/pages/report/report?from=visit' }) },
+    toEntry() { if (guard()) uni.navigateTo({ url: '/pages/entry/entry' }) },
+    toMeds() { if (guard()) uni.navigateTo({ url: '/pages/meds/meds' }) },
     toRecord() { uni.switchTab({ url: '/pages/record/record' }) },
-    go(url) { uni.navigateTo({ url }) }
+    go(url) { if (guard()) uni.navigateTo({ url }) }
   }
 }
 </script>

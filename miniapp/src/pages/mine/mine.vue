@@ -7,7 +7,7 @@
       <view class="ring"></view>
       <view class="top">
         <button class="av" open-type="chooseAvatar" @chooseavatar="onAvatar"><image v-if="avatar" class="avi" :src="avatar" mode="aspectFill" /><image v-else src="/static/icons/user-w.svg" /><view class="ave"><image src="/static/icons/edit-g.svg" /></view></button>
-        <view class="flex1"><view class="f20 cw b nmv" @tap="editName">{{ name }}<image src="/static/icons/edit-w.svg" /></view><view class="f12 cw o8">坚持记录第 {{ days }} 天</view></view>
+        <view class="flex1"><view class="f20 cw b nmv" @tap="editName">{{ name }}<image src="/static/icons/edit-w.svg" /></view><view class="f12 cw o8" v-if="!guest">坚持记录第 {{ days }} 天</view><view class="f12 cw o8 guest-login" v-else @tap="toLogin">登录后同步你的数据 ›</view></view>
         <view class="badge f10">隐私协议 v{{ ver }}</view>
       </view>
       <view class="stats">
@@ -42,35 +42,41 @@
   </view>
 </template>
 <script>
-import { syncProfile, updateMe, uploadAvatar, getVisit, listPatients, setRole, guard, getProfile, listRecords, listMedDefs, listFamily, getRemind, exportData, deleteAccount, getConsent, dayKey } from '../../api.js'
+import { syncProfile, updateMe, uploadAvatar, getVisit, listPatients, setRole, guard, isLoggedIn, getProfile, listRecords, listMedDefs, listFamily, getRemind, exportData, deleteAccount, getConsent, dayKey } from '../../api.js'
 export default {
-  data: () => ({ visit: '', pats: 0, name: '', total: 0, days: 0, meds: 0, fam: 0, rem: '', json: '', ver: '', avatar: '', nmOpen: false, nmIn: '' }),
+  data: () => ({ guest: false, visit: '', pats: 0, name: '', total: 0, days: 0, meds: 0, fam: 0, rem: '', json: '', ver: '', avatar: '', nmOpen: false, nmIn: '' }),
   computed: { g1() { return [
     { t: '用药管理', i: 'pill-g', bg: 'bg-g', u: '/pages/meds/meds', s: this.meds ? this.meds + ' 种药' : '未添加' },
     { t: '测量提醒', i: 'bell-b', bg: 'bg-b', u: '/pages/remind/remind', s: this.rem },
     { t: '家人共享', i: 'family-o', bg: 'bg-o', u: '/pages/family/family', s: this.fam ? this.fam + ' 位家人' : '未绑定' }] } },
   async onShow() {
-    if (!guard()) return
+    if (!isLoggedIn()) {
+      this.guest = true; this.name = '未登录'; this.avatar = ''; this.total = 0; this.days = 0; this.meds = 0
+      this.fam = 0; this.rem = '登录后可设置'; this.visit = '登录后可设置'; this.pats = 0; this.ver = '1.0'
+      return
+    }
+    this.guest = false
     let pf = getProfile(); this.name = pf.nickname; this.avatar = pf.avatar || ''; pf = await syncProfile(); this.name = pf.nickname; this.avatar = pf.avatar || ''; this.ver = (getConsent() || {}).version
     const r = await listRecords(); this.total = r.length; this.days = new Set(r.map(x => dayKey(x.time))).size
     this.meds = (await listMedDefs()).length; this.fam = (await listFamily()).length
     const v = await getVisit(); this.visit = v ? v.date.slice(5).replace('-', '/') + ' 复诊' : '未设置'
     this.pats = (await listPatients().catch(() => [])).length
-    const m = await getRemind(); const n = [m.morning.on, m.evening.on].filter(Boolean).length; this.rem = n ? '已开启 ' + n + ' 个' : '未开启'
+    const rm = await getRemind(); const n = [rm.morning.on, rm.evening.on].filter(Boolean).length; this.rem = n ? '已开启 ' + n + ' 个' : '未开启'
   },
   methods: {
-    go(url) { uni.navigateTo({ url }) },
-    onAvatar(e) {
+    go(url) { if (guard()) uni.navigateTo({ url }) },
+    toLogin() { uni.navigateTo({ url: '/pages/login/login' }) },
+    onAvatar(e) { if (!guard()) return;
       const p = e.detail && e.detail.avatarUrl; if (!p) return
       uni.showLoading({ title: '上传中' })
       uploadAvatar(p).then(u => updateMe({ avatarUrl: u })).then(pf => { this.avatar = pf.avatar; uni.showToast({ title: '头像已更新', icon: 'none' }) }).catch(() => {}).finally(() => uni.hideLoading())
     },
-    editName() { this.nmIn = this.name; this.nmOpen = true },
+    editName() { if (!guard()) return; this.nmIn = this.name; this.nmOpen = true },
     async saveName() {
       const n = (this.nmIn || '').trim(); if (!n || n.length > 20) return uni.showToast({ title: '昵称需 1-20 个字', icon: 'none' })
       const pf = await updateMe({ nickname: n }); this.name = pf.nickname; this.nmOpen = false; uni.showToast({ title: '已保存', icon: 'none' })
     },
-    toFamily() { setRole('family'); uni.reLaunch({ url: '/pages/family/home' }) },
+    toFamily() { if (!guard()) return; setRole('family'); uni.reLaunch({ url: '/pages/family/home' }) },
     async exp() {
       const s = JSON.stringify(await exportData(), null, 2)
       // #ifdef H5

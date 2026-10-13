@@ -23,7 +23,7 @@
   </view>
 </template>
 <script>
-import { guard, getReport, getReportName, setReportName, getRole, getProfile } from '../../api.js'
+import { guard, isLoggedIn, getReport, getReportName, setReportName, getRole, getProfile } from '../../api.js'
 const p2 = n => String(n).padStart(2, '0')
 const ymd = d => d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate())
 // 报告卡绘制：高度随内容变化（宽 360 设计坐标）
@@ -138,7 +138,8 @@ export default {
     return { opts: [{ k: 7, t: '近7天' }, { k: 30, t: '近30天' }, { k: 90, t: '近90天' }, { k: 'custom', t: '自定义' }], mode: 30, from: ymd(f), to: ymd(t), today: ymd(t), name: '', rep: null, err: '', fromVisit: false, W, H: Math.round(W * 16 / 9) }
   },
   onLoad(o) {
-    if (!guard()) return; this.name = getReportName() || getProfile().nickname || ''
+    if (!isLoggedIn()) { uni.showToast({ title: '登录后可生成报告卡', icon: 'none' }); setTimeout(() => uni.navigateTo({ url: '/pages/login/login' }), 400); return }
+    this.name = getReportName() || getProfile().nickname || ''
     if (getRole() === 'family') { uni.showToast({ title: '家人端不提供导出', icon: 'none' }); return setTimeout(() => uni.navigateBack(), 800) }
     // 从复诊提醒进入：结束日期为今天，默认往前 30 天（自定义范围，可改选）
     if (o && o.from === 'visit') { this.fromVisit = true; this.mode = 'custom' }

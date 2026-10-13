@@ -1,7 +1,7 @@
 // 数据层：全部请求 Go 后端（见仓库 server/README.md）；本地只存登录 token、授权记录、昵称、身份等少量状态。
 // 后端地址：VITE_API_BASE（默认 http://127.0.0.1:8080）
 const ENV = import.meta.env || {}
-const BASE = (ENV.VITE_API_BASE || 'http://192.168.43.13:8080').replace(/\/$/, '')
+const BASE = (ENV.VITE_API_BASE || 'http://127.0.0.1:8080').replace(/\/$/, '')
 // 订阅消息模板 ID（公众平台申请后填入，与后端 WX_TPL_* 对应）
 export const SUBSCRIBE_TMPL_IDS = []
 const K = { consent: 'health_consent', invite: 'family_invite', profile: 'profile', role: 'role' }
@@ -45,7 +45,13 @@ const dayKey = t => { const d = new Date(t); return d.getFullYear() + '-' + (d.g
 // ---------- 登录与授权 ----------
 export const hasConsent = () => !!uni.getStorageSync(K.consent)
 export const getConsent = () => uni.getStorageSync(K.consent) || null
-export function guard() { if (!hasConsent()) { uni.reLaunch({ url: '/pages/login/login' }); return false } return true }
+export const isLoggedIn = () => !!uni.getStorageSync('token')
+// 写操作前调用：未登录则打开登录页，浏览不拦截
+export function guard() {
+  if (isLoggedIn()) return true
+  uni.navigateTo({ url: '/pages/login/login' })
+  return false
+}
 // 昵称只在本机已有时带上；不再每次登录用默认名覆盖后端昵称
 export async function login(nickname = (get(K.profile, null) || {}).nickname || '') {
   const consent = { agreedAt: Date.now(), version: CONSENT_VERSION }

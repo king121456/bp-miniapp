@@ -1,21 +1,107 @@
 {
   "pages": [
-    { "path": "pages/login/login", "style": { "navigationStyle": "custom", "navigationBarTitleText": "欢迎使用" } },
-    { "path": "pages/index/index", "style": { "navigationStyle": "custom", "navigationBarTitleText": "首页" } },
-    { "path": "pages/record/record", "style": { "navigationStyle": "custom", "navigationBarTitleText": "记录" } },
-    { "path": "pages/mine/mine", "style": { "navigationStyle": "custom", "navigationBarTitleText": "我的" } },
-    { "path": "pages/entry/entry", "style": { "navigationBarTitleText": "记录血压" } },
-    { "path": "pages/meds/meds", "style": { "navigationBarTitleText": "用药管理" } },
-    { "path": "pages/meds/edit", "style": { "navigationBarTitleText": "编辑药品" } },
-    { "path": "pages/remind/remind", "style": { "navigationBarTitleText": "测量提醒" } },
-    { "path": "pages/family/family", "style": { "navigationBarTitleText": "家人共享" } },
-    { "path": "pages/family/view", "style": { "navigationBarTitleText": "家人视角" } },
-    { "path": "pages/report/report", "style": { "navigationBarTitleText": "就诊报告卡" } },
-    { "path": "pages/role/role", "style": { "navigationStyle": "custom", "navigationBarTitleText": "选择身份" } },
-    { "path": "pages/family/home", "style": { "navigationStyle": "custom", "navigationBarTitleText": "我关注的家人" } },
-    { "path": "pages/meds/makeup", "style": { "navigationBarTitleText": "补记" } },
-    { "path": "pages/visit/visit", "style": { "navigationBarTitleText": "复诊提醒" } },
-    { "path": "pages/privacy/privacy", "style": { "navigationBarTitleText": "隐私说明" } }
+    {
+      "path": "pages/index/index",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "首页"
+      }
+    },
+    {
+      "path": "pages/login/login",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "欢迎使用"
+      }
+    },
+    {
+      "path": "pages/record/record",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "记录"
+      }
+    },
+    {
+      "path": "pages/mine/mine",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "我的"
+      }
+    },
+    {
+      "path": "pages/entry/entry",
+      "style": {
+        "navigationBarTitleText": "记录血压"
+      }
+    },
+    {
+      "path": "pages/meds/meds",
+      "style": {
+        "navigationBarTitleText": "用药管理"
+      }
+    },
+    {
+      "path": "pages/meds/edit",
+      "style": {
+        "navigationBarTitleText": "编辑药品"
+      }
+    },
+    {
+      "path": "pages/remind/remind",
+      "style": {
+        "navigationBarTitleText": "测量提醒"
+      }
+    },
+    {
+      "path": "pages/family/family",
+      "style": {
+        "navigationBarTitleText": "家人共享"
+      }
+    },
+    {
+      "path": "pages/family/view",
+      "style": {
+        "navigationBarTitleText": "家人视角"
+      }
+    },
+    {
+      "path": "pages/report/report",
+      "style": {
+        "navigationBarTitleText": "就诊报告卡"
+      }
+    },
+    {
+      "path": "pages/role/role",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "选择身份"
+      }
+    },
+    {
+      "path": "pages/family/home",
+      "style": {
+        "navigationStyle": "custom",
+        "navigationBarTitleText": "我关注的家人"
+      }
+    },
+    {
+      "path": "pages/meds/makeup",
+      "style": {
+        "navigationBarTitleText": "补记"
+      }
+    },
+    {
+      "path": "pages/visit/visit",
+      "style": {
+        "navigationBarTitleText": "复诊提醒"
+      }
+    },
+    {
+      "path": "pages/privacy/privacy",
+      "style": {
+        "navigationBarTitleText": "隐私说明"
+      }
+    }
   ],
   "globalStyle": {
     "navigationBarTextStyle": "black",
@@ -31,9 +117,24 @@
     "fontSize": "10px",
     "iconWidth": "24px",
     "list": [
-      { "pagePath": "pages/index/index", "text": "首页", "iconPath": "static/tab/index.png", "selectedIconPath": "static/tab/index-on.png" },
-      { "pagePath": "pages/record/record", "text": "记录", "iconPath": "static/tab/record.png", "selectedIconPath": "static/tab/record-on.png" },
-      { "pagePath": "pages/mine/mine", "text": "我的", "iconPath": "static/tab/mine.png", "selectedIconPath": "static/tab/mine-on.png" }
+      {
+        "pagePath": "pages/index/index",
+        "text": "首页",
+        "iconPath": "static/tab/index.png",
+        "selectedIconPath": "static/tab/index-on.png"
+      },
+      {
+        "pagePath": "pages/record/record",
+        "text": "记录",
+        "iconPath": "static/tab/record.png",
+        "selectedIconPath": "static/tab/record-on.png"
+      },
+      {
+        "pagePath": "pages/mine/mine",
+        "text": "我的",
+        "iconPath": "static/tab/mine.png",
+        "selectedIconPath": "static/tab/mine-on.png"
+      }
     ]
   }
 }
