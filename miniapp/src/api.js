@@ -138,7 +138,7 @@ export async function listVisitHistory() { return (await listVisits()).history }
 export async function saveVisit(v, replace = false) {
   const rb = { visitDate: v.date, hospital: (v.hospital || '').slice(0, 30), department: (v.department || '').slice(0, 20), note: (v.note || '').slice(0, 100), remindTime: v.remindTime || VISIT_REMIND_DEFAULT }
   // #ifdef MP-WEIXIN
-  if (VISIT_TMPL_ID) await new Promise(ok => uni.requestSubscribeMessage({ tmplIds: [VISIT_TMPL_ID], success: r => { if (r[VISIT_TMPL_ID] === 'accept') req('/api/subscribe', 'POST', { accepted: ['visit_remind'] }).catch(() => {}) }, complete: ok }))
+  if (VISIT_TMPL_ID) await new Promise(ok => uni.requestSubscribeMessage({ tmplIds: [VISIT_TMPL_ID], success: r => { if (r[VISIT_TMPL_ID] === 'accept') req('/api/subscribe', 'POST', { accepted: ['visit'] }).catch(() => {}) }, complete: ok }))
   // #endif
   if (v.id) return req('/api/visits/' + v.id, 'PUT', rb)
   try { return await req('/api/visits', 'POST', { ...rb, replace }, [409]) } catch (e) { if (e && e.code === 409) throw { conflict: toVisit(e.data) || {} }; throw e }
