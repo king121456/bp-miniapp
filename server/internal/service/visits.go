@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 	"time"
 	"unicode/utf8"
 
@@ -190,12 +191,8 @@ func (a *App) FireVisit(ctx context.Context, v model.Visit, doPush bool) model.V
 	status := "skipped"
 	if doPush {
 		d, _ := time.ParseInLocation("2006-01-02", v.VisitDate, model.CST)
-		msg := "明天（" + model.MDLabel(v.VisitDate) + "）复诊"
-		if v.Hospital+v.Department != "" {
-			msg += "：" + v.Hospital + v.Department
-		}
 		status = a.Push(ctx, v.Patient, "visit", v.ID, v.RemindTime, d.AddDate(0, 0, -1).Format("2006-01-02"), title,
-			map[string]string{"thing1": model.Trunc(msg, 20), "time2": v.VisitDate}, true, extra)
+			visitTplData(v), true, extra)
 		if status == "dup" {
 			return v
 		}
@@ -231,4 +228,25 @@ func (a *App) ExpireVisits(ctx context.Context, now time.Time) {
 	today := now.In(model.CST).Format("2006-01-02")
 	_, _ = a.C("visits").UpdateMany(ctx, bson.M{"status": "upcoming", "visitDate": bson.M{"$lt": today}}, bson.M{"$set": bson.M{"status": "past", "updatedAt": time.Now()}})
 	_, _ = a.C("todos").UpdateMany(ctx, bson.M{"kind": "visit", "done": false, "expiresAt": bson.M{"$lte": now}}, bson.M{"$set": bson.M{"done": true, "expired": true}})
+}
+
+// visitTplData 按公众平台「复诊提醒」模板（编号 26393）组装字段：
+// thing3 复诊医院、thing13 提醒事项、time1 复诊日期、thing8 复诊科室。thing 类最多 20 字，不能为空。
+func visitTplData(v model.Visit) map[string]string {
+	or := func(s, d string) string {
+		if s = strings.TrimSpace(s); s == "" {
+			return d
+		}
+		return model.Trunc(s, 20)
+	}
+	date := v.VisitDate
+	if d, err := time.ParseInLocation("2006-01-02", v.VisitDate, model.CST); err == nil {
+		date = d.Format("2006年01月02日")
+	}
+	return map[string]string{
+		"thing3":  or(v.Hospital, "未填写"),
+		"thing13": "明天复诊，可生成就诊卡片",
+		"time1":   date,
+		"thing8":  or(v.Department, "未填写"),
+	}
 }

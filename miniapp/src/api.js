@@ -122,7 +122,7 @@ export async function listCheckins() {
 }
 
 // ---------- 复诊日提醒（PRD 5.9） ----------
-export const VISIT_TMPL_ID = 'zCWcykb6X2AUurA2mKEJDTVH7FabHX8R2lr73aVbWZ4' // 订阅消息模板「复诊提醒」visit_remind，审核通过后填入
+export const VISIT_TMPL_ID = 'zCWcykb6X2AUurA2mKEJDTVH7FabHX8R2Ir73aVbWZ4' // 订阅消息模板「复诊提醒」visit_remind，审核通过后填入
 export const VISIT_REMIND_DEFAULT = '19:00' // 复诊前一天提醒时间【可调整】
 const parseYmd = s => { const [y, m, d] = s.split('-').map(Number); return new Date(y, m - 1, d) }
 export const visitRemindAt = v => { const d = parseYmd(v.date); const [h, m] = (v.remindTime || VISIT_REMIND_DEFAULT).split(':').map(Number); return new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1, h, m).getTime() }
