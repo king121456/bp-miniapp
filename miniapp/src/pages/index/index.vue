@@ -64,16 +64,15 @@
 
     <view class="mini">
       <view class="card" @tap="go('/pages/family/family')"><view class="ic bg-o"><image src="/static/icons/family-o.svg" /></view><view><view class="f14 c0 b">家人共享</view><view class="f10 c9">{{ famCount ? famCount + ' 位家人在关注' : '邀请家人查看' }}</view></view></view>
-      <view class="card" @tap="go('/pages/remind/remind')"><view class="ic bg-b"><image src="/static/icons/bell-b.svg" /></view><view><view class="f14 c0 b">测量提醒</view><view class="f10 c9 num">{{ remindStr }}</view></view></view>
     </view>
     <slot-sheet :item="pick" @close="pick = null" @done="afterMakeup" />
     <view style="height:40rpx"></view>
   </view>
 </template>
 <script>
-import { guard, isLoggedIn, listRecords, listMeds, checkin, listFamily, getRemind, getProfile, isToday, hhmm, weekStart, WEEK, makeupCount, skipSlot, getVisit, visitRemindAt, daysUntil, getRole } from '../../api.js'
+import { guard, isLoggedIn, listRecords, listMeds, checkin, listFamily, getProfile, isToday, hhmm, weekStart, WEEK, makeupCount, skipSlot, getVisit, visitRemindAt, daysUntil, getRole } from '../../api.js'
 export default {
-  data: () => ({ guest: false, records: [], meds: [], famCount: 0, remind: null, name: '', now: Date.now(), missCount: 0, visit: null, visitLoaded: false, pick: null }),
+  data: () => ({ guest: false, records: [], meds: [], famCount: 0, name: '', now: Date.now(), missCount: 0, visit: null, visitLoaded: false, pick: null }),
   computed: {
     dateStr() { const d = new Date(this.now); return `${d.getMonth() + 1}月${d.getDate()}日 星期${WEEK[d.getDay()]}` },
     greet() { const h = new Date(this.now).getHours(); return h < 5 ? '夜深了' : h < 11 ? '早上好' : h < 13 ? '中午好' : h < 18 ? '下午好' : '晚上好' },
@@ -87,12 +86,11 @@ export default {
     visitLine() { const n = daysUntil(this.visit.date); return (n === 0 ? '今天' : '明天') + '（' + this.md(this.visit.date) + '）复诊' },
     visitPlace() { const v = this.visit; return v ? [v.hospital, v.department].filter(Boolean).join(' ') : '' },
     doneCount() { return this.meds.filter(m => m.done).length },
-    remindStr() { const r = this.remind; if (!r) return ''; const a = [r.morning.on && r.morning.time, r.evening.on && r.evening.time].filter(Boolean); return a.length ? a.join(' / ') : '未开启' }
   },
   onShow() {
     if (!isLoggedIn()) {
       this.guest = true; this.name = ''; this.records = []; this.meds = []; this.famCount = 0
-      this.remind = null; this.missCount = 0; this.visit = null; this.visitLoaded = true; this.pick = null
+      this.missCount = 0; this.visit = null; this.visitLoaded = true; this.pick = null
       return
     }
     this.guest = false
@@ -104,7 +102,7 @@ export default {
   methods: {
     async load() {
       this.now = Date.now(); this.name = getProfile().nickname
-      ;[this.records, this.meds, this.remind] = await Promise.all([listRecords(), listMeds(), getRemind()])
+      ;[this.records, this.meds] = await Promise.all([listRecords(), listMeds()])
       this.famCount = (await listFamily()).length
       this.missCount = await makeupCount()
       this.visit = await getVisit(); this.visitLoaded = true

@@ -42,12 +42,11 @@
   </view>
 </template>
 <script>
-import { syncProfile, updateMe, uploadAvatar, getVisit, listPatients, setRole, guard, isLoggedIn, getProfile, listRecords, listMedDefs, listFamily, getRemind, exportData, deleteAccount, getConsent, dayKey } from '../../api.js'
+import { syncProfile, updateMe, uploadAvatar, getVisit, listPatients, setRole, guard, isLoggedIn, getProfile, listRecords, listMedDefs, listFamily, exportData, deleteAccount, getConsent, dayKey } from '../../api.js'
 export default {
   data: () => ({ guest: false, visit: '', pats: 0, name: '', total: 0, days: 0, meds: 0, fam: 0, rem: '', json: '', ver: '', avatar: '', nmOpen: false, nmIn: '' }),
   computed: { g1() { return [
     { t: '用药管理', i: 'pill-g', bg: 'bg-g', u: '/pages/meds/meds', s: this.meds ? this.meds + ' 种药' : '未添加' },
-    { t: '测量提醒', i: 'bell-b', bg: 'bg-b', u: '/pages/remind/remind', s: this.rem },
     { t: '家人共享', i: 'family-o', bg: 'bg-o', u: '/pages/family/family', s: this.fam ? this.fam + ' 位家人' : '未绑定' }] } },
   async onShow() {
     if (!isLoggedIn()) {
@@ -61,7 +60,6 @@ export default {
     this.meds = (await listMedDefs()).length; this.fam = (await listFamily()).length
     const v = await getVisit(); this.visit = v ? v.date.slice(5).replace('-', '/') + ' 复诊' : '未设置'
     this.pats = (await listPatients().catch(() => [])).length
-    const rm = await getRemind(); const n = [rm.morning.on, rm.evening.on].filter(Boolean).length; this.rem = n ? '已开启 ' + n + ' 个' : '未开启'
   },
   methods: {
     go(url) { if (guard()) uni.navigateTo({ url }) },

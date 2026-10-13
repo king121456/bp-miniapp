@@ -148,15 +148,6 @@ export async function deleteVisit(id) { return req('/api/visits/' + id, 'DELETE'
 
 // ---------- 测量提醒 ----------
 // 后端：enabled 总开关 + morningEnabled / eveningEnabled 分开关（未返回时视为开）
-export async function getRemind() {
-  const m = await req('/api/reminders/measure')
-  if (!m || (!m.morning && !m.evening)) return { morning: { on: true, time: '08:00' }, evening: { on: true, time: '20:00' } }
-  return { morning: { on: !!(m.enabled && m.morning && m.morningEnabled !== false), time: m.morning || '08:00' }, evening: { on: !!(m.enabled && m.evening && m.eveningEnabled !== false), time: m.evening || '20:00' } }
-}
-export async function saveRemind(r) {
-  await req('/api/reminders/measure', 'PUT', { enabled: r.morning.on || r.evening.on, morningEnabled: r.morning.on, eveningEnabled: r.evening.on, morning: r.morning.time, evening: r.evening.time })
-  return {}
-}
 
 // ---------- 家人共享 ----------
 export async function createInvite() { const d = await req('/api/family/invite', 'POST'); const inv = { code: d.code, expireAt: ms(d.expiresAt) }; set(K.invite, inv); return inv }

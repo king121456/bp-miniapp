@@ -47,12 +47,6 @@
       }
     },
     {
-      "path": "pages/remind/remind",
-      "style": {
-        "navigationBarTitleText": "测量提醒"
-      }
-    },
-    {
       "path": "pages/family/family",
       "style": {
         "navigationBarTitleText": "家人共享"
